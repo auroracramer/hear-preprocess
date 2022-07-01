@@ -136,7 +136,6 @@ def validate_generic_task_config(
             schema.update(
                 {
                     "in_channel_format": Or("stereo", "foa"),
-                    "vst_paths": Optional(Schema([str]))
                 }
             )
         else:
