@@ -170,15 +170,15 @@ class ExtractSpatialEventsMetadata(ExtractMetadata):
                         if valid_azimuths:
                             azi = units_utils.norm_angle(
                                 events.azimuths[cls_idx][ev_idx][step_idx],
-                                events.azimuths_unit))
+                                events.azimuths_unit)
                         if valid_elevations:
                             ele = units_utils.norm_angle(
                                 events.elevations[cls_idx][ev_idx][step_idx],
-                                events.elevations_unit))
+                                events.elevations_unit)
                         if valid_distances:
                             dist = units_utils.norm_angle(
                                 events.elevations[cls_idx][ev_idx][step_idx],
-                                events.elevations_unit))
+                                events.elevations_unit)
 
                         row = (t_start, t_end, ev_idx, label) \
                             + opt_tuple(azi, valid_azimuths) \
