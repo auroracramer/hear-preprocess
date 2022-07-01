@@ -17,7 +17,7 @@ import hearpreprocess.pipeline as pipeline
 import hearpreprocess.speech_commands as speech_commands
 import hearpreprocess.spoken_digit as spoken_digit
 import hearpreprocess.tfds_speech_commands as tfds_speech_commands
-import hearpreprocess.soundata_tau2021sse_nigen as soundata_taus2021sse_nigens
+import hearpreprocess.soundata_tau2021sse_nigens as soundata_taus2021sse_nigens
 from hearpreprocess.util.task_config import validate_generic_task_config
 
 logger = logging.getLogger("luigi-interface")
