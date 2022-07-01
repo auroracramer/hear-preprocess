@@ -1390,7 +1390,7 @@ class FinalCombine(MetadataTask):
                 metadata_task=self.metadata_task,
                 task_config=self.task_config,
             ),
-            "channel_reformat": ChannelReformatSubcorpus(
+            "channel_reformat": ChannelReformatSubcorpuses(
                 sample_rates=self.sample_rates,
                 channel_formats=self.channel_formats,
                 metadata_task=self.metadata_task,
