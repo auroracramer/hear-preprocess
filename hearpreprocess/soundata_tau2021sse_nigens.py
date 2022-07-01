@@ -19,7 +19,7 @@ logger = logging.getLogger("luigi-interface")
 
 generic_task_config = {
     # Define the task name and the version
-    "task_name": "tfds_speech_commands",
+    "task_name": "soundata_tau2021sse_nigens",
     "version": "hear2021-ext",
     "embedding_type": "event", # we'll only support "event" for seld
     "prediction_type": "seld", # TODO implement prediction type
@@ -107,7 +107,12 @@ class ExtractMetadata(soundata_pipeline.ExtractSpatialEventsMetadata):
         
 
     def requires(self):
-        return {"train": self.train, "test": self.test}
+        return {
+            "train": self.train,
+            "test": self.test,
+            "metadata_train": self.metadata_train, 
+            "metadata_eval": self.metadata_eval
+        }
 
 
 
