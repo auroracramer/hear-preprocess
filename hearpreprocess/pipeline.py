@@ -31,6 +31,7 @@ from hearpreprocess.util.luigi import (
     safecopy,
     str2int,
 )
+from hearpreprocess.util.spatial import get_spatial_columns
 
 INCLUDE_DATESTR_IN_FINAL_PATHS = False
 
@@ -96,16 +97,18 @@ def _diagnose_split_labels(
                 )
             )
 
+    # TODO: Diagnose spatial distribution
+
     # Confirm that there are examples for all class labels
     # This is a requirement for many metrics
     if task_config["mode"] != "small" and any(
         split_label_missing[split] for split in splits
     ):
-        # Event multilabel tasks are an exception (e.g. maestro)
+        # Event multilabel and SELD tasks are an exception (e.g. maestro)
         if (
             task_config["embedding_type"] == "event"
             and task_config["prediction_type"] == "multilabel"
-        ):
+        ) or (task_config["prediction_type"] == "seld"):
             warnings.warn(
                 "All labels are not present across the splits. "
                 "Please check logs to see which files are missing."
@@ -307,7 +310,7 @@ class ExtractMetadata(WorkTask):
         archive.
         (We could also use datapath.)
 
-        Override: For some corpora:
+        Override: For some corpora:new_split_kfold
         * An instrument cannot be split (nsynth)
         * A speaker cannot be split (speech_commands)
         """
@@ -321,6 +324,8 @@ class ExtractMetadata(WorkTask):
             * split
             * label
             * start, end: Optional
+            * eventidx: Optional
+            * azimuth, elevation, distance: Optional
         """
         raise NotImplementedError("Deriving classes need to implement this")
 
@@ -404,10 +409,12 @@ class ExtractMetadata(WorkTask):
 
         # First, put the metadata into a deterministic order.
         if "start" in metadata.columns:
+            columns = ["unique_filestem", "start", "end", "label"]
+            if self.task_config["prediction_type"] == "seld":
+                # add spatial columns (which should only be for event type)
+                columns += ["eventidx"] + get_spatial_columns(self.task_config)
             metadata.sort_values(
-                ["unique_filestem", "start", "end", "label"],
-                inplace=True,
-                kind="stable",
+                columns, inplace=True, kind="stable",
             )
         else:
             metadata.sort_values(
@@ -599,11 +606,14 @@ class ExtractMetadata(WorkTask):
             if self.task_config["mode"] == "small" or (
                 self.task_config["embedding_type"] == "event"
                 and self.task_config["prediction_type"] == "multilabel"
+            ) or (
+                self.task_config["prediction_type"] == "seld" # TODO: could we add PSLA/DPP sampling?
             ):
                 # All labels are not required across all folds for either small
                 # or an event and multilable type task
                 break
 
+            # TODO: balance for spatial
             if all(
                 metadata.groupby("split")["label"].nunique()
                 == metadata["label"].nunique()
@@ -689,6 +699,10 @@ class ExtractMetadata(WorkTask):
         if self.task_config["embedding_type"] == "event":
             assert "start" in df.columns
             assert "end" in df.columns
+        if self.task_config["prediction_type"] == "seld":
+            assert "eventidx" in df.columns
+            for col in get_spatial_columns(self.task_config):
+                assert col in df.columns
         return df
 
     def run(self):
@@ -951,9 +965,9 @@ class SubsampleSplit(SplitTask):
         self.mark_complete()
 
 
-class MonoWavSplit(SplitTask):
+class WavSplit(SplitTask):
     """
-    Converts the files to wav and mono encoding.
+    Converts the files to wav. 
 
     This task ensures that the audio is converted to an uncompressed
     format so that any downstream operation on the audio results
@@ -980,7 +994,7 @@ class MonoWavSplit(SplitTask):
             if audiofile.suffix == ".json":
                 continue
             newaudiofile = self.splitdir.joinpath(f"{audiofile.stem}.wav")
-            audio_util.mono_wav(str(audiofile), str(newaudiofile))
+            audio_util.to_wav(str(audiofile), str(newaudiofile))
 
         self.mark_complete()
 
@@ -990,12 +1004,12 @@ class TrimPadSplit(SplitTask):
     Trims and pads the wav audio files
 
     Requires:
-        corpus (MonoWavSplit): task which converts the audio to wav file
+        corpus (WavSplit): task which converts the audio to wav file
     """
 
     def requires(self):
         return {
-            "corpus": MonoWavSplit(
+            "corpus": WavSplit(
                 split=self.split,
                 metadata_task=self.metadata_task,
                 task_config=self.task_config,
@@ -1117,8 +1131,11 @@ class SubcorpusMetadata(MetadataTask):
 
             elif self.task_config["embedding_type"] == "event":
                 # For event labeling each file will have a list of metadata
+                columns = ["unique_filename", "label", "start", "end"]
+                if self.task_config["prediction_type"] == "seld":
+                    columns += ["eventidx"] + get_spatial_columns(self.task_config)
                 audiolabel_json = (
-                    audiolabel_df[["unique_filename", "label", "start", "end"]]
+                    audiolabel_df[columns]
                     .set_index("unique_filename")
                     .groupby(level=0)
                     .apply(lambda group: group.to_dict(orient="records"))
@@ -1228,6 +1245,47 @@ class ResampleSubcorpus(MetadataTask):
         self.mark_complete()
 
 
+class ChannelReformatSubcorpus(MetadataTask):
+    """
+    Reformats channels for audio in one split in the subsampled corpus to a
+    particular channel format
+    Parameters
+        split (str): The split for which the resampling has to be done
+        sr (int): output sampling rate
+    Requires
+        data (SubcorpusData): task which produces the subcorpus data
+    """
+    channel_format = luigi.Parameter()
+    sr = luigi.IntParameter()
+    split = luigi.Parameter()
+
+    def requires(self):
+        tasks = {
+            "data": ResampleSubcorpus(
+                sr=self.sr, split=self.split, task_config=self.task_config
+            )
+        }
+        if self.task_config["in_channel_format"] == "foa" and self.channel_format == "stereo":
+            tasks["vst3_task"] = audio_util.FOAToBinauralTask(
+                task_config=self.task_config)
+
+        return tasks
+
+    def run(self):
+        original_dir = self.workdir.joinpath(str(self.sr)).joinpath(str(self.split))
+        reformat_dir = self.workdir.joinpath(str(self.channel_format)).joinpath(str(self.sr)).joinpath(str(self.split))
+        reformat_dir.mkdir(parents=True, exist_ok=True)
+        for audiofile in tqdm(sorted(list(original_dir.glob("*.wav")))):
+            reformated_audiofile = new_basedir(audiofile, resample_dir)
+            audio_util.channel_reformat_wav(audiofile, reformated_audiofile,
+                in_chfmt=self.task_config.get("in_channel_format", "mixed_mono_stereo"),
+                out_chfmt=self.channel_format,
+                vst3_task=self.requires().get("vst3_task")
+            )
+
+        self.mark_complete()
+
+
 class ResampleSubcorpuses(MetadataTask):
     """
     Aggregates resampling of all the splits and sampling rates
@@ -1263,6 +1321,46 @@ class ResampleSubcorpuses(MetadataTask):
         self.mark_complete()
 
 
+class ChannelReformatSubcorpuses(MetadataTask):
+    """
+    Aggregates channel reformatting of all the splits, sampling rates, and
+    formats into a single task as dependencies.
+
+    Requires:
+        ChannelReformatSubcorpus for all split and sr
+    """
+
+    sample_rates = luigi.ListParameter()
+    channel_formats = luigi.ListParameter()
+
+    def requires(self):
+        # Perform resampling on each split, sampling rate, and channel
+        # format independently. Dependencies set up so resampling is done
+        # before channel reformatting
+        resample_splits = [
+            ChannelReformatSubcorpus(
+                channel_format=ch_fmt,
+                sr=sr,
+                split=split,
+                metadata_task=self.metadata_task,
+                task_config=self.task_config,
+            )
+            for ch_fmt in self.channel_formats
+            for sr in self.sample_rates
+            for split in self.task_config["splits"]
+        ]
+        return resample_splits
+
+    def run(self):
+        workdir = Path(self.workdir)
+        workdir.rmdir()
+        # We need to link the workdir of the requires, they will all be the same
+        # for all the requires so just grab the first one.
+        requires_workdir = Path(self.requires()[0].workdir).absolute()
+        workdir.symlink_to(requires_workdir)
+        self.mark_complete()
+
+
 class FinalCombine(MetadataTask):
     """
     Create a final dataset, no longer in _workdir but in directory
@@ -1280,6 +1378,7 @@ class FinalCombine(MetadataTask):
     """
 
     sample_rates = luigi.ListParameter()
+    channel_formats = luigi.ListParameter()
     tasks_dir = luigi.Parameter()
 
     def requires(self):
@@ -1288,6 +1387,12 @@ class FinalCombine(MetadataTask):
         return {
             "resample": ResampleSubcorpuses(
                 sample_rates=self.sample_rates,
+                metadata_task=self.metadata_task,
+                task_config=self.task_config,
+            ),
+            "channel_reformat": ChannelReformatSubcorpus(
+                sample_rates=self.sample_rates,
+                channel_formats=self.channel_formats,
                 metadata_task=self.metadata_task,
                 task_config=self.task_config,
             ),
@@ -1309,8 +1414,8 @@ class FinalCombine(MetadataTask):
         if self.workdir.exists():
             shutil.rmtree(self.workdir)
 
-        # Copy the resampled files
-        shutil.copytree(self.requires()["resample"].workdir, self.workdir)
+        # Copy the resample and reformatted files
+        shutil.copytree(self.requires()["channel_reformat"].workdir, self.workdir)
 
         # Copy labelvocabulary.csv
         shutil.copy2(
@@ -1358,6 +1463,7 @@ class TarCorpus(MetadataTask):
     """
 
     sample_rate = luigi.IntParameter()
+    channel_format = luigi.Parameter()
     combined_task = luigi.TaskParameter()
     tasks_dir = luigi.Parameter()
     tar_dir = luigi.Parameter()
@@ -1385,16 +1491,16 @@ class TarCorpus(MetadataTask):
         pbar.update(1)
         return tarinfo
 
-    def create_tar(self, sample_rate: int):
+    def create_tar(self, sample_rate: int, channel_format: str):
         if INCLUDE_DATESTR_IN_FINAL_PATHS:
             datestr = datetime.today().strftime("%Y%m%d") + "-"
         else:
             datestr = ""
         tarname = (
             f"hear-{datestr}{__version__}-"
-            + f"{self.versioned_task_name}-{sample_rate}.tar.gz"
+            + f"{self.versioned_task_name}-{channel_format}-{sample_rate}.tar.gz"
         )
-        tarname_latest = f"hear-LATEST-{self.versioned_task_name}-{sample_rate}.tar.gz"
+        tarname_latest = f"hear-LATEST-{self.versioned_task_name}-{channel_format}-{sample_rate}.tar.gz"
         source_dir = str(self.requires()["combined"].workdir)
 
         # Compute the audio files to be tar'ed
@@ -1415,21 +1521,21 @@ class TarCorpus(MetadataTask):
                     tar.add(
                         source_file, self.source_to_archive_path(source_file, datestr)
                     )
-            # Now add audio files for this sample rate
-            sample_rate_source = os.path.join(source_dir, str(sample_rate))
+            # Now add audio files for this sample rate and channel format
+            channel_format_sample_rate_source = os.path.join(source_dir, channel_format, str(sample_rate))
             with tqdm(
                 desc=f"tar {self.versioned_task_name} {sample_rate}", total=len(files)
             ) as pbar:
                 tar.add(
-                    sample_rate_source,
-                    self.source_to_archive_path(sample_rate_source, datestr),
+                    channel_format_sample_rate_source,
+                    self.source_to_archive_path(channel_format_sample_rate_source, datestr),
                     filter=lambda tarinfo: self.tar_filter(tarinfo, pbar),
                 )
         shutil.copyfile(tarfile_workdir, Path(self.tar_dir).joinpath(tarname))
         shutil.copyfile(tarfile_workdir, Path(self.tar_dir).joinpath(tarname_latest))
 
     def run(self):
-        self.create_tar(self.sample_rate)
+        self.create_tar(self.sample_rate, self.channel_format)
         self.mark_complete()
 
 
@@ -1447,12 +1553,14 @@ class FinalizeCorpus(MetadataTask):
     """
 
     sample_rates = luigi.ListParameter()
+    channel_formats = luigi.ListParameter()
     tasks_dir = luigi.Parameter()
     tar_dir = luigi.Parameter()
 
     def requires(self):
         combined_task = FinalCombine(
             sample_rates=self.sample_rates,
+            channel_formats=self.channel_formats,
             tasks_dir=self.tasks_dir,
             metadata_task=self.metadata_task,
             task_config=self.task_config,
@@ -1460,12 +1568,14 @@ class FinalizeCorpus(MetadataTask):
         return {
             str(sr): TarCorpus(
                 sample_rate=sr,
+                channel_format=ch_fmt,
                 combined_task=combined_task,
                 tasks_dir=self.tasks_dir,
                 tar_dir=self.tar_dir,
                 metadata_task=self.metadata_task,
                 task_config=self.task_config,
             )
+            for ch_fmt in self.channel_formats
             for sr in self.sample_rates
         }
 

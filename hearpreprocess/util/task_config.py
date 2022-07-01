@@ -122,7 +122,7 @@ def validate_generic_task_config(
             "task_name": str,
             "version": str,
             "embedding_type": Or("scene", "event", str),
-            "prediction_type": Or("multiclass", "multilabel", str),
+            "prediction_type": Or("multiclass", "multilabel", "seld", str),
             "split_mode": Or("trainvaltest", "presplit_kfold", "new_split_kfold"),
             # When the sample duration is None, the original audio is retained
             # without any trimming and padding
@@ -130,6 +130,26 @@ def validate_generic_task_config(
             "evaluation": Schema([str]),
             "default_mode": Or("5h", "50h", "full", str),
         }
+
+        # Constrain channel formats based on prediction type
+        if "prediction_type" in task_config and task_config["prediction_type"] == "seld":
+            schema.update(
+                {
+                    "in_channel_format": Or("stereo", "foa"),
+                    "vst_paths": Optional(Schema([str]))
+                }
+            )
+        else:
+            # By default, assumed to be "mixed_mono_stereo"
+            schema.update(
+                {
+                    "in_channel_format": Optional(
+                        Or("mono", "stereo", "mixed_mono_stereo", "foa"),
+                        default="mixed_mono_stereo"
+                    ),
+                }
+            )
+
         # DOWNLOAD Source specific keys
         # If the source of data for the task is a tensorflow dataset
         if "tfds_task_name" in task_config:
@@ -143,7 +163,40 @@ def validate_generic_task_config(
                     "extract_splits": Schema([Or(*SPLITS)]),
                 }
             )
+        elif "soundata_dataset_name" in task_config:
         # If the source of data for the task is source download urls
+            schema.update(
+                {
+                    # The soundata dataset name
+                    "soundata_dataset_name": str,
+                    # The tfds dataset name
+                    "soundata_annotation_type": Or("spatial_events", "events", "tags"),
+                    "soundata_valid_spatial_events": Schema(
+                        {
+                            "azimuth": bool,
+                            "elevation": bool,
+                            "distance": bool,
+                        }
+                    ),
+                    # Defines which splits to extract from the tfds dataset source
+                    "soundata_audio_remotes": Schema(
+                        [
+                            {
+                                "split": Or(*SPLITS),
+                                "remote": str
+                            }
+                        ]
+                    ),
+                    "soundata_meta_remotes": Schema(
+                        [
+                            {
+                                "name": str,
+                                "remote": str
+                            }
+                        ]
+                    ),
+                }
+            )
         else:
             # ignore_extra_keys is true for the download_urls dict
             # as the download source might require a different set of keys
@@ -239,3 +292,4 @@ def validate_generic_task_config(
 
         Schema(schema, ignore_extra_keys=ignore_extra_keys).validate(task_config)
         print("Successfully validated")
+

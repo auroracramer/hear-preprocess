@@ -17,6 +17,7 @@ import hearpreprocess.pipeline as pipeline
 import hearpreprocess.speech_commands as speech_commands
 import hearpreprocess.spoken_digit as spoken_digit
 import hearpreprocess.tfds_speech_commands as tfds_speech_commands
+import hearpreprocess.soundata_tau2021sse_nigen as soundata_taus2021sse_nigens
 from hearpreprocess.util.task_config import validate_generic_task_config
 
 logger = logging.getLogger("luigi-interface")
@@ -43,12 +44,24 @@ tasks = {
     "nsynth_pitch_kfold": [nsynth_pitch_kfold],
     "dcase2016_task2": [dcase2016_task2],
     "spoken_digit": [spoken_digit],
+    "soundata_tau2021sse_nigens": [soundata_taus2021sse_nigens],
     "open": [
         speech_commands,
         nsynth_pitch,
         nsynth_pitch_kfold,
         dcase2016_task2,
         spoken_digit,
+        soundata_taus2021sse_nigens
+    ],
+    "mono": [
+        speech_commands,
+        nsynth_pitch,
+        nsynth_pitch_kfold,
+        dcase2016_task2,
+        spoken_digit,
+    ],
+    "spatial": [
+        soundata_taus2021sse_nigens
     ],
     "all": [
         speech_commands,
@@ -56,6 +69,7 @@ tasks = {
         nsynth_pitch_kfold,
         dcase2016_task2,
         spoken_digit,
+        soundata_taus2021sse_nigens
     ]
     + secret_tasks.get("all-secret", []),
     # Add the task config for the secrets task if the secret task config was found.
@@ -77,8 +91,16 @@ tasks = {
     "--sample-rate",
     default=None,
     help="Perform resampling only to this sample rate. "
-    "By default we resample to 16000, 22050, 32000, 44100, 48000.",
+    "By default we resample to 16000, 22050, 24000, 32000, 44100, 48000.",
     type=int,
+)
+@click.option(
+    "--channel-format",
+    default=None,
+    help="Perform spatial reformatting only to this format. "
+    "By default, for spatial tasks (seld) we format to stereo "
+    "and for all other tasks we format to mono.",
+    type=str,
 )
 @click.option(
     "--tmp-dir",
@@ -106,23 +128,34 @@ tasks = {
     help="default, all, or small mode for each task.",
     type=str,
 )
+@click.option(
+    "--vst3-foa2bin-path",
+    default=None,
+    help="path to vst3 for IEM FOA->Binaural decoder",
+    type=str,
+)
 def run(
     tasklist: List[str],
     num_workers: Optional[int] = None,
     sample_rate: Optional[int] = None,
+    channel_format: Optional[str] = None,
     tmp_dir: Optional[str] = "_workdir",
     tasks_dir: Optional[str] = "tasks",
     tar_dir: Optional[str] = ".",
     mode: str = "default",
+    vst3_foa2bin_path: Optional[str] = None,
 ):
     if num_workers is None:
         num_workers = multiprocessing.cpu_count()
         logger.info(f"Using {num_workers} workers")
 
     if sample_rate is None:
-        sample_rates = [16000, 22050, 32000, 44100, 48000]
+        sample_rates = [16000, 22050, 24000, 32000, 44100, 48000]  # include 24000 for TAU datasets
     else:
         sample_rates = [sample_rate]
+
+    if sample_rates is None:
+
 
     tasks_to_run = []
     for task in tasklist:
@@ -130,6 +163,7 @@ def run(
             # Validate the generic task configuration defined for the task
 
             validate_generic_task_config(task_module.generic_task_config)  # type: ignore # noqa: E501
+
             if mode == "default":
                 task_modes = [task_module.generic_task_config["default_mode"]]  # type: ignore # noqa: E501
             elif mode == "small":
@@ -145,6 +179,15 @@ def run(
                 assert task_modes is not [], f"Task {task} has no modes besides 'small'"
             else:
                 raise ValueError(f"mode {mode} unknown")
+
+            if channel_format is None:
+                if task_module.generic_task_config["prediction_type"] == "seld":
+                    channel_formats = ["stereo"]
+                else:
+                    channel_formats = ["mono"]
+            else:
+                channel_formats = [channel_format]
+
             for task_mode in task_modes:
                 task_config = copy.deepcopy(task_module.generic_task_config)  # type: ignore # noqa: E501
                 if task_mode == "small" and "small" not in task_config["modes"]:
@@ -159,6 +202,15 @@ def run(
                 task_config["tmp_dir"] = tmp_dir
                 task_config["mode"] = task_mode
                 del task_config["modes"]
+
+                if task_module.generic_task_config["prediction_type"] == "seld":
+                    assert (
+                        ("stereo" in channel_formats)
+                        and task_module.generic_task_config["in_channel_format"] == "foa"
+                    )
+                    task_config["vst3_paths"] = {
+                        "IEM/BinauralDecoder": vst3_foa2bin_path
+                    }
 
                 # The `splits` key has to be initialised outside the pipeline,
                 # since the splits are used in defining the required tasks
@@ -186,6 +238,7 @@ def run(
                 metadata_task = task_module.extract_metadata_task(task_config)  # type: ignore # noqa: E501
                 final_task = pipeline.FinalizeCorpus(
                     sample_rates=sample_rates,
+                    channel_formats=channel_formats,
                     tasks_dir=tasks_dir,
                     tar_dir=tar_dir,
                     metadata_task=metadata_task,
