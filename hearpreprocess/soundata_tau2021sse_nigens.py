@@ -79,6 +79,9 @@ generic_task_config = {
 }
 
 class ExtractMetadata(soundata_pipeline.ExtractSpatialEventsMetadata):
+    train = luigi.TaskParameter()
+    test = luigi.TaskParameter()
+    valid = luigi.TaskParameter()
     metadata_train = luigi.TaskParameter()
     metadata_eval = luigi.TaskParameter()
 

@@ -95,13 +95,9 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
     train set in the `ExtractMetadata.split_train_test_val`.
     """
 
-    train = luigi.TaskParameter()
-    test = luigi.TaskParameter()
-    valid = luigi.TaskParameter()
-
     def requires(self):
         # Override this depending on available splits
-        return {"train": self.train, "test": self.test, "valid": self.valid}
+        raise NotImplementedError("Deriving classes need to implement this")
 
     @staticmethod
     def skip_clip(clip, split) -> bool:
