@@ -154,9 +154,6 @@ def run(
     else:
         sample_rates = [sample_rate]
 
-    if sample_rates is None:
-
-
     tasks_to_run = []
     for task in tasklist:
         for task_module in tasks[task]:
