@@ -20,6 +20,7 @@ from tqdm import tqdm
 from pedalboard import VST3Plugin
 
 from hearpreprocess.util.misc import opt_dict
+from hearpreprocess.util.luigi import WorkTask
 
 
 class VST3PluginTask(WorkTask):
