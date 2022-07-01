@@ -79,6 +79,9 @@ generic_task_config = {
 }
 
 class ExtractMetadata(soundata_pipeline.ExtractSpatialEventsMetadata):
+    metadata_train = luigi.TaskParameter()
+    metadata_eval = luigi.TaskParameter()
+
     @staticmethod
     def skip_clip_id(clip_id, split) -> bool:
         # the TAU 2021 SSE NIGENS class doesn't have a split property,
