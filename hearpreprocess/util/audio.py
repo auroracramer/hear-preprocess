@@ -24,7 +24,6 @@ from hearpreprocess.util.luigi import WorkTask
 
 
 class VST3PluginTask(WorkTask):
-    vst_path = luigi.Parameter()
     _vst: Optional[VST3Plugin] = None
 
     @staticmethod
