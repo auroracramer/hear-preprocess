@@ -86,7 +86,7 @@ def get_download_and_extract_tasks_soundata(
 
 
 # Define an ExtractMetadata class for each type of metadata
-class ExtractSpatialEventsMetadata(ExtractMetadata):
+class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
     """
     All the splits are present in the soundata data set by default.
     If not, please override this `ExtractMetadata`, rather than using it
