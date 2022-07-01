@@ -1262,7 +1262,7 @@ class ChannelReformatSubcorpus(MetadataTask):
     def requires(self):
         tasks = {
             "data": ResampleSubcorpus(
-                sr=self.sr, split=self.split, task_config=self.task_config
+                sr=self.sr, split=self.split, task_config=self.task_config, metadata_task=self.metadata_task
             )
         }
         if self.task_config["in_channel_format"] == "foa" and self.channel_format == "stereo":
