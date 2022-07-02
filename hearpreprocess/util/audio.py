@@ -52,6 +52,10 @@ class VST3PluginTask(WorkTask):
             self._vst = self.load_vst(vst_path)
         return self._metadata
 
+    @property
+    def stage_number(self) -> int:
+        return 0
+
 
 class FOAToBinauralTask(VST3PluginTask):
     @staticmethod
