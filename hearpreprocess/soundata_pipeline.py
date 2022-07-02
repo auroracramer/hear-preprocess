@@ -16,7 +16,7 @@ import logging
 from multiprocessing.sharedctypes import Value
 from pathlib import Path
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type
 
 import os
 import luigi
@@ -77,7 +77,7 @@ class DownloadExtractSoundata(luigi_util.WorkTask):
 
 def get_download_and_extract_tasks_soundata(
     task_config: Dict,
-    download_cls: type[DownloadExtractSoundata],
+    download_cls: Type[DownloadExtractSoundata],
 ) -> Dict[str, luigi_util.WorkTask]:
     """Gets all the download and extract tasks for tensorflow dataset"""
     tasks = {}
