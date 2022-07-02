@@ -42,15 +42,15 @@ class VST3PluginTask(WorkTask):
         with pedalboard.io.AudioFile(os.path.realpath(inp_path), 'r') as f:
             inp_audio = f.read(f.frames)
             sr = f.samplerate
-        out_audio = self._vst(inp_audio, sr)
+        out_audio = self.vst(inp_audio, sr)
         sf.write(out_path, out_audio, sr)
         
     @property
-    def _vst(self):
+    def vst(self):
         if self._vst is None:
             vst_path =  self.task_config["vst3_paths"]["IEM/BinauralDecoder"]
             self._vst = self.load_vst(vst_path)
-        return self._metadata
+        return self._vst
 
     @property
     def stage_number(self) -> int:
@@ -58,7 +58,7 @@ class VST3PluginTask(WorkTask):
 
     def run(self):
         # load vst
-        self._vst
+        self.vst
         self.mark_complete()
 
 
