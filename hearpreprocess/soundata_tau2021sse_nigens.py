@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import logging
+import os
 import luigi
 import pandas as pd
 from multiprocessing.sharedctypes import Value
 from typing import Any, Dict
+from pathlib import Path
 
 import hearpreprocess.soundata_pipeline as soundata_pipeline
 import hearpreprocess.util.units as units_utils
@@ -78,6 +80,34 @@ generic_task_config = {
     },
 }
 
+
+class DownloadExtractSoundata(soundata_pipeline.DownloadExtractSoundata):
+    "Download and extract the Soundata dataset"
+
+    @property
+    def output_path(self):
+        assert self.task_config["in_channel_format"] == "foa"
+        start = self.remote.replace("metadata", "foa")
+        is_metadata = self.remote.startswith("metadata")
+
+        for clip_id in self.dataset.clip_ids:
+            if clip_id.startswith(start):
+                audio_path = Path(self.dataset.clip(clip_id).audio_path)
+                # Soundata keeps track of audio filepaths explicitly, but not
+                # metadata, so we have to manually map it for this dataset's
+                # convention
+                if is_metadata:
+                    parts = list(audio_path.parts)
+                    parts[-3] = self.remote
+                    metadata_path = Path(*parts) 
+                    dirname = str(metadata_path.parent)
+                else:
+                    dirname = str(audio_path.parent)
+                return dirname
+        else:
+            raise ValueError("No valid output path")
+
+
 class ExtractMetadata(soundata_pipeline.ExtractSpatialEventsMetadata):
     train = luigi.TaskParameter()
     test = luigi.TaskParameter()
@@ -115,13 +145,13 @@ class ExtractMetadata(soundata_pipeline.ExtractSpatialEventsMetadata):
         }
 
 
-
-
 def extract_metadata_task(task_config: Dict[str, Any]) -> ExtractMetadata:
     # Build the dataset pipeline with the custom metadata configuration task.
     # Please note the tfds download and extract tasks are used to download and the
     # extract the tensorflow data splits below
-    download_tasks = soundata_pipeline.get_download_and_extract_tasks_soundata(task_config)
+    download_tasks = soundata_pipeline.get_download_and_extract_tasks_soundata(
+        task_config, DownloadExtractSoundata
+    )
     
     # Set up constructor based on annotation type
     annotation_type = task_config["soundata_annotation_type"]

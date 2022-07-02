@@ -50,34 +50,46 @@ class DownloadExtractSoundata(luigi_util.WorkTask):
     "Download and extract the Soundata dataset"
 
     remote = luigi.OptionalParameter()
+    _dataset: Optional[soundata.Dataset] = None
 
     @property
     def stage_number(self) -> int:
         return 0
 
+    @property
+    def output_path(self):
+        raise NotImplementedError("Deriving classes need to implement this")
+
+    @property
+    def dataset(self):
+        if self._dataset is None:
+            self._dataset = get_soundata_dataset(self.task_config, self.workdir)
+        return self._dataset
+
+
     def run(self):
-        dataset = get_soundata_dataset(self.task_config, self.workdir)
         # Download and prepare the data in the task folder
         remote = self.remote or None # make sure unspecified 
-        dataset.download(partial_download=[remote])
+        self.dataset.download(partial_download=[remote])
         self.mark_complete()
 
 
 def get_download_and_extract_tasks_soundata(
     task_config: Dict,
+    download_cls: type[DownloadExtractSoundata],
 ) -> Dict[str, luigi_util.WorkTask]:
     """Gets all the download and extract tasks for tensorflow dataset"""
     tasks = {}
     for obj in task_config["soundata_audio_remotes"]:
         outdir = obj["split"]
-        tasks[outdir] = DownloadExtractSoundata(
+        tasks[outdir] = download_cls(
             remote=obj["remote"],
             task_config=task_config
         )
 
     for obj in task_config["soundata_meta_remotes"]:
         outdir = obj["name"]
-        tasks[outdir] = DownloadExtractSoundata(
+        tasks[outdir] = download_cls(
             remote=obj["remote"],
             task_config=task_config
         )
