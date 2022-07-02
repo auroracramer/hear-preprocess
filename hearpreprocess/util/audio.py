@@ -30,8 +30,7 @@ class VST3PluginTask(WorkTask):
     def set_vst_params(vst):
         raise NotImplementedError("Deriving classes need to implement this")
 
-    @staticmethod
-    def load_vst(vst_path):
+    def load_vst(self, vst_path):
         assert vst_path is not None, "Required VST path was not provided"
         assert os.path.exists(vst_path), "Cannot find VST path"
         vst = pedalboard.load_plugin(vst_path)
