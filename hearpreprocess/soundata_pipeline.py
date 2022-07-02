@@ -40,7 +40,7 @@ def get_soundata_dataset(task_config, workdir):
     Returns the soundata object which can be used to download and prepare the
     data (in `DownloadSoundata`)
     """
-    task_name = self.task_config["soundata_dataset_name"]
+    task_name = task_config["soundata_dataset_name"]
     dataset = soundata.initialize(task_name, data_home=workdir)
 
     return dataset
