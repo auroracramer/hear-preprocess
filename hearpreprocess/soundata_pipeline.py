@@ -25,6 +25,7 @@ import pandas as pd
 import soundfile as sf
 import tensorflow as tf
 import soundata
+import soundata.core
 from slugify import slugify
 from tqdm import tqdm
 
@@ -50,7 +51,7 @@ class DownloadExtractSoundata(luigi_util.WorkTask):
     "Download and extract the Soundata dataset"
 
     remote = luigi.OptionalParameter()
-    _dataset: Optional[soundata.Dataset] = None
+    _dataset: Optional[soundata.core.Dataset] = None
 
     @property
     def stage_number(self) -> int:
