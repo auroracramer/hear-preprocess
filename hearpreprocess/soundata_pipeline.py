@@ -59,7 +59,7 @@ class DownloadExtractSoundata(luigi_util.WorkTask):
         dataset = get_soundata_dataset(self.task_config, self.workdir)
         # Download and prepare the data in the task folder
         remote = self.remote or None # make sure unspecified 
-        dataset.download(partial_download=remote)
+        dataset.download(partial_download=[remote])
         self.mark_complete()
 
 
