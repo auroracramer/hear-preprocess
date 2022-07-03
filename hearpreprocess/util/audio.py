@@ -10,7 +10,6 @@ from glob import glob
 from pathlib import Path
 from typing import List, Optional, Union, Dict, Any
 
-import luigi
 import numpy as np
 import soundfile as sf
 import ffmpeg

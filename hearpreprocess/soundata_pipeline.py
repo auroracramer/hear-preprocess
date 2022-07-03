@@ -32,6 +32,7 @@ from tqdm import tqdm
 import hearpreprocess.pipeline as pipeline
 import hearpreprocess.util.luigi as luigi_util
 import hearpreprocess.util.units as units_util
+from hearpreprocess.util.misc import opt_list, opt_tuple
 
 logger = logging.getLogger("luigi-interface")
 
@@ -145,7 +146,7 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                     num_pos_steps = events.azimuths[label_idx][ev_idx].shape[0]
                     # Iterate through each positional time step in the event
                     for step_idx in range(num_pos_steps):
-                        t_start = units_utils.norm_time(
+                        t_start = units_util.norm_time(
                             events.intervals[label_idx][ev_idx][0] \
                                 + (step_idx * events.time_step),
                             events.intervals_unit)
@@ -159,23 +160,23 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                             # If there's only one step, either the source is not
                             # moving or the event only lasts for time_step
                             t_end =  events.intervals[label_idx][ev_idx][1]
-                        t_end = units_utils.norm_time(
+                        t_end = units_util.norm_time(
                             t_end,
                             events.intervals_unit),
                         
                         # Normalize positions if available
                         azi = ele = dist = None
                         if valid_azimuths:
-                            azi = units_utils.norm_angle(
-                                events.azimuths[cls_idx][ev_idx][step_idx],
+                            azi = units_util.norm_angle(
+                                events.azimuths[label_idx][ev_idx][step_idx],
                                 events.azimuths_unit)
                         if valid_elevations:
-                            ele = units_utils.norm_angle(
-                                events.elevations[cls_idx][ev_idx][step_idx],
+                            ele = units_util.norm_angle(
+                                events.elevations[label_idx][ev_idx][step_idx],
                                 events.elevations_unit)
                         if valid_distances:
-                            dist = units_utils.norm_angle(
-                                events.elevations[cls_idx][ev_idx][step_idx],
+                            dist = units_util.norm_angle(
+                                events.elevations[label_idx][ev_idx][step_idx],
                                 events.elevations_unit)
 
                         row = (t_start, t_end, ev_idx, label) \
