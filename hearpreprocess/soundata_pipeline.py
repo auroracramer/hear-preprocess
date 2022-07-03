@@ -118,9 +118,7 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
         logger.info(f"Preparing metadata for {split}")
 
         # Start and end times are in milliseconds
-        dataset = get_soundata_dataset(
-            self.task_config,
-            self.workdir)
+        dataset = self.requires()[split].dataset
 
         valid_azimuths = self.task_config["soundata_valid_spatial_events"]["azimuth"]
         valid_elevations = self.task_config["soundata_valid_spatial_events"]["elevation"]
