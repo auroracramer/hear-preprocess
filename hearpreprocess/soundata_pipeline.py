@@ -112,13 +112,11 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
         # Override this depending on available splits
         raise NotImplementedError("Deriving classes need to implement this")
 
-    @staticmethod
-    def skip_clip(clip, split) -> bool:
+    def skip_clip(self, clip, split) -> bool:
         # Override for filtering based on clip object and split
         return False
 
-    @staticmethod
-    def skip_clip_id(clip_id, split) -> bool:
+    def skip_clip_id(self, clip_id, split) -> bool:
         # Override for filtering based on clip id and split to avoid loading
         # the annotation
         return False
