@@ -178,19 +178,11 @@ def validate_generic_task_config(
                         }
                     ),
                     # Defines which splits to extract from the tfds dataset source
-                    "soundata_audio_remotes": Schema(
+                    "soundata_splits": Schema(
                         [
                             {
                                 "split": Or(*SPLITS),
-                                "remote": str
-                            }
-                        ]
-                    ),
-                    "soundata_meta_remotes": Schema(
-                        [
-                            {
-                                "name": str,
-                                "remote": str
+                                "remotes": Schema([str])
                             }
                         ]
                     ),

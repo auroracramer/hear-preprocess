@@ -43,24 +43,14 @@ generic_task_config = {
         "elevation": True,
         "distance": False
     },
-    "soundata_audio_remotes": [
+    "soundata_remotes": [
         {
             "split": "train",
-            "remote": "foa_dev"
+            "remotes": ["foa_dev", "metadata_dev"]
         },
         {
             "split": "test",
-            "remote": "foa_eval"
-        },
-    ],
-    "soundata_meta_remotes": [
-        {
-            "name": "metadata_train",
-            "remote": "metadata_dev"
-        },
-        {
-            "name": "metadata_eval",
-            "remote": "metadata_eval"
+            "remotes": ["foa_eval", "metadata_eval"]
         },
     ],
     "default_mode": "5h",
@@ -87,22 +77,17 @@ class DownloadExtractSoundata(soundata_pipeline.DownloadExtractSoundata):
     @property
     def output_path(self):
         assert self.task_config["in_channel_format"] == "foa"
-        start = self.remote.replace("metadata", "foa")
-        is_metadata = self.remote.startswith("metadata")
-
+        assert len(self.remotes) == 2
+        # Get remote name corresponding to audio
+        start = (
+            self.remotes[0] if (not self.remotes[0].startswith("metadata"))
+            else self.remotes[1]
+        )
+        # Get first clip corresponding to this split
         for clip_id in self.dataset.clip_ids:
             if clip_id.startswith(start):
                 audio_path = Path(self.dataset.clip(clip_id).audio_path)
-                # Soundata keeps track of audio filepaths explicitly, but not
-                # metadata, so we have to manually map it for this dataset's
-                # convention
-                if is_metadata:
-                    parts = list(audio_path.parts)
-                    parts[-3] = self.remote
-                    metadata_path = Path(*parts) 
-                    dirname = str(metadata_path.parent)
-                else:
-                    dirname = str(audio_path.parent)
+                dirname = str(audio_path.parent)
                 return dirname
         else:
             raise ValueError("No valid output path")
@@ -111,8 +96,6 @@ class DownloadExtractSoundata(soundata_pipeline.DownloadExtractSoundata):
 class ExtractMetadata(soundata_pipeline.ExtractSpatialEventsMetadata):
     train = luigi.TaskParameter()
     test = luigi.TaskParameter()
-    metadata_train = luigi.TaskParameter()
-    metadata_eval = luigi.TaskParameter()
 
     def skip_clip_id(self, clip_id, split) -> bool:
         # the TAU 2021 SSE NIGENS class doesn't have a split property,
@@ -138,9 +121,7 @@ class ExtractMetadata(soundata_pipeline.ExtractSpatialEventsMetadata):
     def requires(self):
         return {
             "train": self.train,
-            "test": self.test,
-            "metadata_train": self.metadata_train, 
-            "metadata_eval": self.metadata_eval
+            "test": self.test
         }
 
 

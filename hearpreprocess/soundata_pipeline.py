@@ -50,7 +50,7 @@ def get_soundata_dataset(task_config, workdir):
 class DownloadExtractSoundata(luigi_util.WorkTask):
     "Download and extract the Soundata dataset"
 
-    remote = luigi.OptionalParameter()
+    remotes = luigi.ListParameter()
     _dataset: Optional[soundata.core.Dataset] = None
 
     @property
@@ -70,8 +70,8 @@ class DownloadExtractSoundata(luigi_util.WorkTask):
 
     def run(self):
         # Download and prepare the data in the task folder
-        remote = self.remote or None # make sure unspecified 
-        self.dataset.download(partial_download=[remote])
+        remotes = self.remotes or None
+        self.dataset.download(partial_download=remotes)
         self.mark_complete()
 
 
@@ -81,17 +81,10 @@ def get_download_and_extract_tasks_soundata(
 ) -> Dict[str, luigi_util.WorkTask]:
     """Gets all the download and extract tasks for tensorflow dataset"""
     tasks = {}
-    for obj in task_config["soundata_audio_remotes"]:
+    for obj in task_config["soundata_splits"]:
         outdir = obj["split"]
         tasks[outdir] = download_cls(
-            remote=obj["remote"],
-            task_config=task_config
-        )
-
-    for obj in task_config["soundata_meta_remotes"]:
-        outdir = obj["name"]
-        tasks[outdir] = download_cls(
-            remote=obj["remote"],
+            remotes=obj["remotes"],
             task_config=task_config
         )
 
