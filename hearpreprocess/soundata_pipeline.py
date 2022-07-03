@@ -135,7 +135,7 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                 continue
 
             events = clip.spatial_events
-            relpath = os.path.relpath(clip.audio_path, start=self.workdir)
+            relpath = os.path.relpath(clip.audio_path, start=self.requires()[split].workdir)
             
             metadata = []
             # Iterate through each label in the clip
