@@ -70,7 +70,7 @@ class DownloadExtractSoundata(luigi_util.WorkTask):
 
     def run(self):
         # Download and prepare the data in the task folder
-        remotes = self.remotes or None
+        remotes = list(self.remotes) if self.remotes else None
         self.dataset.download(partial_download=remotes)
         self.mark_complete()
 
