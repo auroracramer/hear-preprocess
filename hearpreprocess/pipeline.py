@@ -446,6 +446,8 @@ class ExtractMetadata(WorkTask):
                 metadata.reset_index(drop=True, inplace=True)
                 assert len(metadata) == sum(exists)
             else:
+                print(f"{len(exists)} exists, {len(metadata)} metadata")
+                print(f"{metadata['relpath'][0]}")
                 raise FileNotFoundError(
                     "Files in the metadata are missing in the directory"
                 )
