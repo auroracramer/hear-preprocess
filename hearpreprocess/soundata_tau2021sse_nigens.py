@@ -43,7 +43,7 @@ generic_task_config = {
         "elevation": True,
         "distance": False
     },
-    "soundata_remotes": [
+    "soundata_splits": [
         {
             "split": "train",
             "remotes": ["foa_dev", "metadata_dev"]
