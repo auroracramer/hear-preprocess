@@ -7,9 +7,9 @@ DISTANCE_UNITS = "meters"
 
 time_scale_factors = {
     "seconds": 1.0, # everything defined w.r.t. seconds
-    "milliseconds": 1.0e3,
-    "miliseconds": 1.0e3, # accounting for soundata typo
-    "nanoseconds": 1.0e9,
+    "milliseconds": 1.0e-3,
+    "miliseconds": 1.0e-3, # accounting for soundata typo
+    "nanoseconds": 1.0e-9,
     "minutes": 60.0,
     "hours": 3600.0,
     "days": 86400.0,
@@ -41,7 +41,7 @@ def fmod(x, y) -> float:
 def convert_units(val, input_units, target_units, scale_factor_dict) -> float:
     input_factor = scale_factor_dict[input_units]
     target_factor = scale_factor_dict[target_units]
-    factor =  fdiv(target_factor, input_factor)
+    factor =  fdiv(input_factor, target_factor)
     return val * factor
 
 
