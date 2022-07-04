@@ -105,7 +105,7 @@ class DownloadExtractSoundata(soundata_pipeline.DownloadExtractSoundata):
         )
         clip_audio_paths = [
             self.dataset.clip(clip_id).audio_path
-            for clip_id in self.dataset.clip_ids:
+            for clip_id in self.dataset.clip_ids
             if clip_id.startswith(prefix)
         ]
         if not clip_audio_paths:

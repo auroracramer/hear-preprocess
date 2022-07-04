@@ -37,20 +37,10 @@ from hearpreprocess.util.misc import opt_list, opt_tuple, first
 logger = logging.getLogger("luigi-interface")
 
 
-def get_soundata_dataset(task_config, workdir):
-    """
-    Returns the soundata object which can be used to download and prepare the
-    data (in `DownloadSoundata`)
-    """
-    task_name = task_config["soundata_dataset_name"]
-    dataset = soundata.initialize(task_name, data_home=workdir)
-
-    return dataset
-
-
 class DownloadExtractSoundata(luigi_util.WorkTask):
     "Download and extract the Soundata dataset"
 
+    task_name = luigi.Parameter()
     remotes = luigi.ListParameter()
     _dataset: Optional[soundata.core.Dataset] = None
 
@@ -65,7 +55,7 @@ class DownloadExtractSoundata(luigi_util.WorkTask):
     @property
     def dataset(self):
         if self._dataset is None:
-            self._dataset = get_soundata_dataset(self.task_config, self.workdir)
+            self._dataset = soundata.initialize(self.task_name, data_home=self.workdir)
         return self._dataset
 
 
@@ -85,6 +75,7 @@ def get_download_and_extract_tasks_soundata(
     for obj in task_config["soundata_splits"]:
         outdir = obj["split"]
         tasks[outdir] = download_cls(
+            task_name=task_config["soundata_dataset_name"],
             remotes=obj["remotes"],
             task_config=task_config
         )
@@ -113,6 +104,7 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
         )
 
     def skip_clip(self, clip, split) -> bool:
+        split_dict = self._get_split_dict(split)
         res = False
         for filter_dict in split_dict["filters"]:
             if filter_dict["type"] == "clip_attr":
