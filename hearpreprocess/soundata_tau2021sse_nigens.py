@@ -24,7 +24,7 @@ generic_task_config = {
     "embedding_type": "event", # we'll only support "event" for seld
     "prediction_type": "seld", # TODO implement prediction type
     "split_mode": "trainvaltest",
-    "sample_duration": 1.0,
+    "sample_duration": 60.0,
     "evaluation": ["top1_acc"], # TODO: gotta change this
     # This task uses tfds which doesn't require the download paths,
     # but rather the tfds dataset name and version. For speech commands
