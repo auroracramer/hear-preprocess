@@ -446,8 +446,15 @@ class ExtractMetadata(WorkTask):
                 metadata.reset_index(drop=True, inplace=True)
                 assert len(metadata) == sum(exists)
             else:
-                print(f"{len(exists)} exists, {len(metadata)} metadata")
-                print(f"{metadata['relpath'][0]}")
+                from hearpreprocess.util.misc import first
+                print(f"{sum(exists)} exists, {len(metadata)} metadata")
+                print(
+                    first(
+                        path
+                        for path, ex in zip(metadata['relpath'], exists)
+                        if not ex
+                    )
+                )
                 raise FileNotFoundError(
                     "Files in the metadata are missing in the directory"
                 )
