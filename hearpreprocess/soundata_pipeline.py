@@ -176,7 +176,8 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                             t_end =  events.intervals[label_idx][ev_idx][1]
                         t_end = units_util.norm_time(
                             t_end,
-                            events.intervals_unit),
+                            events.intervals_unit
+                        )
                         
                         # Normalize positions if available
                         azi = ele = dist = None
