@@ -39,9 +39,9 @@ def fmod(x, y) -> float:
 
 
 def convert_units(val, input_units, target_units, scale_factor_dict) -> float:
-    inp_factor = scale_factor_dict[target_units]
-    out_factor = scale_factor_dict[input_units]
-    factor =  fdiv(inp_factor, out_factor)
+    input_factor = scale_factor_dict[input_units]
+    target_factor = scale_factor_dict[target_units]
+    factor =  fdiv(target_factor, input_factor)
     return val * factor
 
 
