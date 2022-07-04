@@ -11,3 +11,8 @@ def opt_tuple(val, cond):
 def opt_dict(key, val, cond):
     """ Conditionally define tuple elements for appending inline """
     return {key: val} if cond else {}
+
+
+def first(iterable):
+    """ Return first element of an iterable """
+    return next(iter(iterable))

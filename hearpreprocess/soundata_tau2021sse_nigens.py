@@ -8,7 +8,7 @@ from typing import Any, Dict
 from pathlib import Path
 
 import hearpreprocess.soundata_pipeline as soundata_pipeline
-from hearpreprocess.util.misc import opt_list, opt_tuple
+from hearpreprocess.util.misc import opt_list, opt_tuple, first
 from hearpreprocess.pipeline import (
     TRAIN_PERCENTAGE,
     TRAINVAL_PERCENTAGE,
@@ -44,11 +44,33 @@ generic_task_config = {
     "soundata_splits": [
         {
             "split": "train",
-            "remotes": ["foa_dev", "metadata_dev"]
+            "remotes": ["foa_dev", "metadata_dev"],
+            "filters": [
+                {
+                    "type": "clip_id_prefix",
+                    "prefix_list": ["foa_dev/dev-train"]
+                }
+            ]
+        },
+        {
+            "split": "valid",
+            "remotes": ["foa_dev", "metadata_dev"],
+            "filters": [
+                {
+                    "type": "clip_id_prefix",
+                    "prefix_list": ["foa_dev/dev-valid", "foa_dev/dev-test"]
+                }
+            ]
         },
         {
             "split": "test",
-            "remotes": ["foa_eval", "metadata_eval"]
+            "remotes": ["foa_eval", "metadata_eval"],
+            "filters": [
+                {
+                    "type": "clip_id_prefix",
+                    "prefix_list": ["foa_eval/eval-test"]
+                }
+            ]
         },
     ],
     "default_mode": "5h",
@@ -77,48 +99,31 @@ class DownloadExtractSoundata(soundata_pipeline.DownloadExtractSoundata):
         assert self.task_config["in_channel_format"] == "foa"
         assert len(self.remotes) == 2
         # Get remote name corresponding to audio
-        start = (
-            self.remotes[0] if (not self.remotes[0].startswith("metadata"))
-            else self.remotes[1]
+        prefix = first(
+            remote for remote in self.remotes
+            if not remote.startswith("metadata")
         )
-        # Get first clip corresponding to this split
-        for clip_id in self.dataset.clip_ids:
-            if clip_id.startswith(start):
-                audio_path = Path(self.dataset.clip(clip_id).audio_path)
-                dirname = str(audio_path.parent)
-                return dirname
-        else:
+        clip_audio_paths = [
+            self.dataset.clip(clip_id).audio_path
+            for clip_id in self.dataset.clip_ids:
+            if clip_id.startswith(prefix)
+        ]
+        if not clip_audio_paths:
             raise ValueError("No valid output path")
+
+        # Return the directory containing all of the audio encompassed
+        return os.path.commonpath(clip_audio_paths)
 
 
 class ExtractMetadata(soundata_pipeline.ExtractSpatialEventsMetadata):
     train = luigi.TaskParameter()
+    valid = luigi.TaskParameter()
     test = luigi.TaskParameter()
-
-    def skip_clip_id(self, clip_id, split) -> bool:
-        # the TAU 2021 SSE NIGENS class doesn't have a split property,
-        # so we infer it from the clip_id
-        fmt = self.task_config["in_channel_format"]
-        if fmt == "foa":
-            prefix = "foa"
-        else:
-            raise ValueError(f"Unsupported audio format {fmt}")
-
-        if split == "train":
-            suffix = "dev"
-        elif split == "test":
-            suffix = "eval"
-        else:
-            raise ValueError(f"Invalid split: {split}")
-
-        start = f"{prefix}_{suffix}"
-
-        return not clip_id.startswith(start)
-        
 
     def requires(self):
         return {
             "train": self.train,
+            "valid": self.valid,
             "test": self.test
         }
 

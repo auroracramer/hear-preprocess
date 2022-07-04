@@ -182,7 +182,15 @@ def validate_generic_task_config(
                         [
                             {
                                 "split": Or(*SPLITS),
-                                "remotes": Schema([str])
+                                "remotes": Schema([str]),
+                                "filters": Schema([
+                                    {
+                                        "type": Or("clip_id_prefix", "clip_attr", str),
+                                        Optional("prefix_list"): Schema([str]),
+                                        Optional("attr_name"): str,
+                                        Optional("attr_value_list"): Schema([str]),
+                                    }
+                                ])
                             }
                         ]
                     ),

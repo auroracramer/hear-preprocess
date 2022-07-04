@@ -32,7 +32,7 @@ from tqdm import tqdm
 import hearpreprocess.pipeline as pipeline
 import hearpreprocess.util.luigi as luigi_util
 import hearpreprocess.util.units as units_util
-from hearpreprocess.util.misc import opt_list, opt_tuple
+from hearpreprocess.util.misc import opt_list, opt_tuple, first
 
 logger = logging.getLogger("luigi-interface")
 
@@ -106,14 +106,36 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
         # Override this depending on available splits
         raise NotImplementedError("Deriving classes need to implement this")
 
+    def _get_split_dict(self, split):
+        return first(
+            split_obj for split_obj in self.task_config["soundata_splits"]
+            if split_obj["split"] == split
+        )
+
     def skip_clip(self, clip, split) -> bool:
-        # Override for filtering based on clip object and split
-        return False
+        res = False
+        for filter_dict in split_dict["filters"]:
+            if filter_dict["type"] == "clip_attr":
+                attr = filter_dict["attr_name"]
+                valid = False
+                # Valid if one of the filters is true
+                for attr_value in filter_dict["attr_value_list"]:
+                    valid = valid or (getattr(clip, attr) == attr_value)
+                res = not valid
+
+        return res
 
     def skip_clip_id(self, clip_id, split) -> bool:
-        # Override for filtering based on clip id and split to avoid loading
-        # the annotation
-        return False
+        split_dict = self._get_split_dict(split)
+        res = False
+        for filter_dict in split_dict["filters"]:
+            if filter_dict["type"] == "clip_id_prefix":
+                valid = False
+                # Valid if one of the filters is true
+                for prefix in filter_dict["prefix_list"]:
+                    valid = valid or clip_id.startswith(prefix)
+                res = not valid
+        return res
 
     def get_requires_metadata(self, split: str) -> pd.DataFrame:
         logger.info(f"Preparing metadata for {split}")
