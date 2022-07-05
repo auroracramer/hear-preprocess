@@ -41,7 +41,14 @@ class VST3PluginTask(WorkTask):
             inp_audio = f.read(f.frames)
             sr = f.samplerate
         out_audio = self.vst(inp_audio, sr)
+        # Apply postprocessing
+        out_audio = self.postprocess(out_audio)
         sf.write(out_path, out_audio, sr)
+
+    def postprocess(self, audio):
+        # Overwrite if you need to do something to the audio
+        # not done by the plugin
+        return audio
         
     @property
     def vst(self):
@@ -66,6 +73,10 @@ class FOAToBinauralTask(VST3PluginTask):
         vst.bypass = False
         vst.input_ambisonic_order = "1st"
         vst.input_normalization = "N3D"
+
+    def postprocess(self, audio):
+        # Grab the first two channels since the last two will just be silence
+        return audio[:, :2]
     
 
 def to_wav(in_file: str, out_file: str,
