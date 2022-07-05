@@ -1273,11 +1273,11 @@ class ChannelReformatSubcorpus(MetadataTask):
         return tasks
 
     def run(self):
-        original_dir = self.workdir.joinpath(str(self.sr)).joinpath(str(self.split))
+        original_dir = self.requires()["data"].workdir.joinpath(str(self.sr)).joinpath(str(self.split))
         reformat_dir = self.workdir.joinpath(str(self.channel_format)).joinpath(str(self.sr)).joinpath(str(self.split))
         reformat_dir.mkdir(parents=True, exist_ok=True)
         for audiofile in tqdm(sorted(list(original_dir.glob("*.wav")))):
-            reformated_audiofile = new_basedir(audiofile, resample_dir)
+            reformated_audiofile = new_basedir(audiofile, reformat_dir)
             audio_util.channel_reformat_wav(audiofile, reformated_audiofile,
                 in_chfmt=self.task_config.get("in_channel_format", "mixed_mono_stereo"),
                 out_chfmt=self.channel_format,
