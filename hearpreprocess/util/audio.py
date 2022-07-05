@@ -43,7 +43,7 @@ class VST3PluginTask(WorkTask):
         out_audio = self.vst(inp_audio, sr)
         # Apply postprocessing
         out_audio = self.postprocess(out_audio)
-        sf.write(out_path, out_audio, sr)
+        sf.write(out_path, out_audio, int(sr))
 
     def postprocess(self, audio):
         # Overwrite if you need to do something to the audio
