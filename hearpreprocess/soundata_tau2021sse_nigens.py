@@ -58,7 +58,7 @@ generic_task_config = {
             "filters": [
                 {
                     "type": "clip_id_prefix",
-                    "prefix_list": ["foa_dev/dev-valid", "foa_dev/dev-test"]
+                    "prefix_list": ["foa_dev/dev-val", "foa_dev/dev-test"]
                 }
             ]
         },
