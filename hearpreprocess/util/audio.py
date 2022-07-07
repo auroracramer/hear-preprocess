@@ -37,13 +37,20 @@ class VST3PluginTask(WorkTask):
         return vst
 
     def process(self, inp_path, out_path):
-        with pedalboard.io.AudioFile(os.path.realpath(inp_path), 'r') as f:
+        # Convert to absolute paths to avoid pedalboard warnings
+        inp_path = os.path.realpath(inp_path)
+        out_path = os.path.realpath(out_path)
+        with pedalboard.io.AudioFile(inp_path, 'r') as f:
+            # NOTE: pedalboard loads audio in array of shape
+            # (n_chan, n_samples), opposite of soundfile behavior
             inp_audio = f.read(f.frames)
             sr = f.samplerate
         out_audio = self.vst(inp_audio, sr)
         # Apply postprocessing
         out_audio = self.postprocess(out_audio)
-        sf.write(out_path, out_audio, int(sr))
+        out_n_chan = out_audio.shape[0]
+        with pedalboard.io.AudioFile(out_path, 'w', sr, out_n_chan) as f:
+            f.write(out_audio)
 
     def postprocess(self, audio):
         # Overwrite if you need to do something to the audio
@@ -76,7 +83,7 @@ class FOAToBinauralTask(VST3PluginTask):
 
     def postprocess(self, audio):
         # Grab the first two channels since the last two will just be silence
-        return audio[:, :2]
+        return audio[:2]
     
 
 def to_wav(in_file: str, out_file: str,
