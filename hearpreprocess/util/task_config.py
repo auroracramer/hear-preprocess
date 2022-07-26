@@ -136,6 +136,10 @@ def validate_generic_task_config(
             schema.update(
                 {
                     "in_channel_format": Or("stereo", "foa"),
+                    # Spatial projection used for targets
+                    "spatial_projection": Or(
+                        "unit_sphere", "unit_xy_disc", "unit_yz_disc", str
+                    ),
                 }
             )
         else:
@@ -170,13 +174,6 @@ def validate_generic_task_config(
                     "soundata_dataset_name": str,
                     # The tfds dataset name
                     "soundata_annotation_type": Or("spatial_events", "events", "tags"),
-                    "soundata_valid_spatial_events": Schema(
-                        {
-                            "azimuth": bool,
-                            "elevation": bool,
-                            "distance": bool,
-                        }
-                    ),
                     # Defines which splits to extract from the tfds dataset source
                     "soundata_splits": Schema(
                         [
@@ -196,6 +193,18 @@ def validate_generic_task_config(
                     ),
                 }
             )
+            if "prediction_type" in task_config and task_config["prediction_type"] == "seld":
+                schema.update(
+                    {
+                        "soundata_valid_spatial_events": Schema(
+                            {
+                                "azimuth": bool,
+                                "elevation": bool,
+                                "distance": bool,
+                            }
+                        ),
+                    }
+                )
         else:
             # ignore_extra_keys is true for the download_urls dict
             # as the download source might require a different set of keys
