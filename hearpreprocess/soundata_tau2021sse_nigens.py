@@ -2,13 +2,10 @@
 import logging
 import os
 import luigi
-import pandas as pd
-from multiprocessing.sharedctypes import Value
 from typing import Any, Dict
-from pathlib import Path
 
 import hearpreprocess.soundata_pipeline as soundata_pipeline
-from hearpreprocess.util.misc import opt_list, opt_tuple, first
+from hearpreprocess.util.misc import first
 from hearpreprocess.pipeline import (
     TRAIN_PERCENTAGE,
     TRAINVAL_PERCENTAGE,
@@ -22,16 +19,17 @@ generic_task_config = {
     "task_name": "soundata_tau2021sse_nigens",
     "version": "hear2021-ext",
     "embedding_type": "event", # we'll only support "event" for seld
-    "prediction_type": "seld", # TODO implement prediction type
+    "prediction_type": "seld",
     "split_mode": "trainvaltest",
     "sample_duration": 60.0,
-    "evaluation": ["top1_acc"], # TODO: gotta change this
+    "evaluation": ["segment_1s_seld"],
     # This task uses tfds which doesn't require the download paths,
     # but rather the tfds dataset name and version. For speech commands
     # the tf dataset has all the splits, and so we will not be
     # doing any custom splitting. All the splits will be extracted
     # from tfds builder.
     "in_channel_format": "foa", # ("mono_stereo", "micarray", "foa")
+    "spatial_projection": "unit_sphere", # none, unit_sphere, unit_xy_disc, unit_yz_disc
     "soundata_dataset_name": "tau2021sse_nigens",
     # By default all the splits for the above task and version will
     # be downloaded, the below key helps to select the splits to extract
