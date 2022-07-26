@@ -18,6 +18,7 @@ import hearpreprocess.speech_commands as speech_commands
 import hearpreprocess.spoken_digit as spoken_digit
 import hearpreprocess.tfds_speech_commands as tfds_speech_commands
 import hearpreprocess.soundata_tau2021sse_nigens as soundata_taus2021sse_nigens
+import hearpreprocess.soundata_tau2021sse_nigens_xy as soundata_taus2021sse_nigens_xy
 from hearpreprocess.util.task_config import validate_generic_task_config
 
 logger = logging.getLogger("luigi-interface")
@@ -45,13 +46,15 @@ tasks = {
     "dcase2016_task2": [dcase2016_task2],
     "spoken_digit": [spoken_digit],
     "soundata_tau2021sse_nigens": [soundata_taus2021sse_nigens],
+    "soundata_tau2021sse_nigens_xy": [soundata_taus2021sse_nigens_xy],
     "open": [
         speech_commands,
         nsynth_pitch,
         nsynth_pitch_kfold,
         dcase2016_task2,
         spoken_digit,
-        soundata_taus2021sse_nigens
+        soundata_taus2021sse_nigens,
+        soundata_taus2021sse_nigens_xy,
     ],
     "mono": [
         speech_commands,
@@ -61,7 +64,8 @@ tasks = {
         spoken_digit,
     ],
     "spatial": [
-        soundata_taus2021sse_nigens
+        soundata_taus2021sse_nigens,
+        soundata_taus2021sse_nigens_xy,
     ],
     "all": [
         speech_commands,
@@ -69,7 +73,8 @@ tasks = {
         nsynth_pitch_kfold,
         dcase2016_task2,
         spoken_digit,
-        soundata_taus2021sse_nigens
+        soundata_taus2021sse_nigens,
+        soundata_taus2021sse_nigens_xy,
     ]
     + secret_tasks.get("all-secret", []),
     # Add the task config for the secrets task if the secret task config was found.
