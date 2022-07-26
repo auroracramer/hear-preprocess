@@ -61,7 +61,7 @@ def norm_dist(dist, input_units, target_units=DISTANCE_UNITS) -> float:
         scale_factor_dict=distance_scale_factors)
 
 
-def norm_angle(angle, input_units, target_units=ANGLE_UNITS) -> float:
+def norm_angle(angle, input_units, target_units=ANGLE_UNITS, symmetric_range=True) -> float:
     angle = convert_units(
         val=angle,
         input_units=input_units,
@@ -73,5 +73,9 @@ def norm_angle(angle, input_units, target_units=ANGLE_UNITS) -> float:
     if not (low <= angle < high):
         # ensure in [0, 360.0) or [0, 2pi)
         angle = fmod(angle, high)
+
+    if symmetric_range:
+        # shift to [-180, 180.0) or [-pi, pi)
+        angle -= fdiv(high, 2.0)
 
     return angle
