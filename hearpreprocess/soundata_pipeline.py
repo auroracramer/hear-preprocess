@@ -13,21 +13,12 @@ labels. This is connected to downstream tasks from the main pipeline.
 
 """
 import logging
-from multiprocessing.sharedctypes import Value
-from pathlib import Path
-from decimal import Decimal
-from typing import Any, Dict, Optional, Type
+from typing import Dict, Optional, Type
 
-import os
 import luigi
-import numpy as np
 import pandas as pd
-import soundfile as sf
-import tensorflow as tf
 import soundata
 import soundata.core
-from slugify import slugify
-from tqdm import tqdm
 
 import hearpreprocess.pipeline as pipeline
 import hearpreprocess.util.luigi as luigi_util
@@ -182,17 +173,28 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                         # Normalize positions if available
                         azi = ele = dist = None
                         if valid_azimuths:
-                            azi = units_util.norm_angle(
-                                events.azimuths[label_idx][ev_idx][step_idx],
-                                events.azimuths_unit)
+                            if self.task_config["spatial_projection"] == "unit_yz_disc":
+                                azi = 0.0
+                            else:
+                                azi = units_util.norm_angle(
+                                    events.azimuths[label_idx][ev_idx][step_idx],
+                                    events.azimuths_unit)
                         if valid_elevations:
-                            ele = units_util.norm_angle(
-                                events.elevations[label_idx][ev_idx][step_idx],
-                                events.elevations_unit)
+                            if self.task_config["spatial_projection"] == "unit_xy_disc":
+                                ele = 0.0
+                            else:
+                                ele = units_util.norm_angle(
+                                    events.elevations[label_idx][ev_idx][step_idx],
+                                    events.elevations_unit)
                         if valid_distances:
-                            dist = units_util.norm_angle(
-                                events.elevations[label_idx][ev_idx][step_idx],
-                                events.elevations_unit)
+                            if self.task_config["spatial_projection"] in (
+                                "unit_sphere", "unit_xy_disc", "unit_yz_disc"
+                            ):
+                                dist = 1.0
+                            else:
+                                dist = units_util.norm_angle(
+                                    events.elevations[label_idx][ev_idx][step_idx],
+                                    events.elevations_unit)
 
                         row = (t_start, t_end, ev_idx, label) \
                             + opt_tuple(azi, valid_azimuths) \
