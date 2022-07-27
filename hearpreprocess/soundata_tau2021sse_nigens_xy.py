@@ -2,6 +2,10 @@
 import copy
 import logging
 import hearpreprocess.soundata_tau2021sse_nigens as soundata_tau2021sse_nigens
+from hearpreprocess.soundata_tau2021sse_nigens import (  # noqa: F401
+    ExtractMetadata,
+    extract_metadata_task,
+)
 
 logger = logging.getLogger("luigi-interface")
 
