@@ -74,8 +74,9 @@ def norm_angle(angle, input_units, target_units=ANGLE_UNITS, symmetric_range=Tru
         # ensure in [0, 360.0) or [0, 2pi)
         angle = fmod(angle, high)
 
-    if symmetric_range:
-        # shift to [-180, 180.0) or [-pi, pi)
-        angle -= fdiv(high, 2.0)
+    halfway = fdiv(high, 2.0)
+    if symmetric_range and angle >= halfway:
+        # wrap [180.0, 360.0) to [-180, 0), or [pi, 2pi) to [-pi, 0)
+        angle -= high
 
     return angle
