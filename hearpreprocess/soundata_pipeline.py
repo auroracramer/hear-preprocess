@@ -19,6 +19,7 @@ import luigi
 import pandas as pd
 import soundata
 import soundata.core
+import intervaltree
 
 import hearpreprocess.pipeline as pipeline
 import hearpreprocess.util.luigi as luigi_util
@@ -74,8 +75,7 @@ def get_download_and_extract_tasks_soundata(
     return tasks
 
 
-# Define an ExtractMetadata class for each type of metadata
-class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
+class ExtractSoundataMetadata(pipeline.ExtractMetadata):
     """
     All the splits are present in the soundata data set by default.
     If not, please override this `ExtractMetadata`, rather than using it
@@ -120,6 +120,15 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                 res = not valid
         return res
 
+    def skip_row(self, **kwargs):
+        # Override to filter specific rows within a clip, specifying args
+        return False
+
+
+
+
+# Define an ExtractMetadata class for each type of metadata
+class ExtractSpatialEventsMetadata(ExtractSoundataMetadata):
     def get_requires_metadata(self, split: str) -> pd.DataFrame:
         logger.info(f"Preparing metadata for {split}")
 
@@ -129,6 +138,15 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
         valid_azimuths = self.task_config["soundata_valid_spatial_events"]["azimuth"]
         valid_elevations = self.task_config["soundata_valid_spatial_events"]["elevation"]
         valid_distances = self.task_config["soundata_valid_spatial_events"]["distance"]
+        valid_track_idxs = self.task_config.get("multitrack", False)
+
+        column_names = (
+            ["start", "end", "eventidx", "label"]
+            + opt_list("trackidx", valid_track_idxs)
+            + opt_list("azimuth", valid_azimuths)
+            + opt_list("elevation", valid_azimuths)
+            + opt_list("distance", valid_distances)
+        )
 
         metadatas = []
         for clip_id in dataset.clip_ids:
@@ -140,19 +158,27 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                 continue
 
             events = clip.spatial_events
-            relpath = clip.audio_path
+            relpath = clip.get_path("audio")
+            num_items = len(events.labels)
+
+            track_idx_list = getattr(
+                events,
+                "track_number_indices",
+                ["0"] * num_items
+            )
             
             metadata = []
             # Iterate through each label in the clip
-            for label_idx, label in enumerate(events.labels):
-                num_events = len(events.intervals[label_idx])
+            for item_idx, label in enumerate(events.labels):
+                num_events = len(events.intervals[item_idx])
+                track_idx = track_idx_list[item_idx]
                 # Iterate through each event for the label
                 for ev_idx in range(num_events):
-                    num_pos_steps = events.azimuths[label_idx][ev_idx].shape[0]
+                    num_pos_steps = events.azimuths[item_idx][ev_idx].shape[0]
                     # Iterate through each positional time step in the event
                     for step_idx in range(num_pos_steps):
                         t_start = units_util.norm_time(
-                            events.intervals[label_idx][ev_idx][0] \
+                            events.intervals[item_idx][ev_idx][0] \
                                 + (step_idx * events.time_step),
                             events.intervals_unit)
                         
@@ -164,7 +190,7 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                         else:
                             # If there's only one step, either the source is not
                             # moving or the event only lasts for time_step
-                            t_end =  events.intervals[label_idx][ev_idx][1]
+                            t_end =  events.intervals[item_idx][ev_idx][1]
                         t_end = units_util.norm_time(
                             t_end,
                             events.intervals_unit
@@ -177,14 +203,14 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                                 azi = 0.0
                             else:
                                 azi = units_util.norm_angle(
-                                    events.azimuths[label_idx][ev_idx][step_idx],
+                                    events.azimuths[item_idx][ev_idx][step_idx],
                                     events.azimuths_unit)
                         if valid_elevations:
                             if self.task_config["spatial_projection"] == "unit_xy_disc":
                                 ele = 0.0
                             else:
                                 ele = units_util.norm_angle(
-                                    events.elevations[label_idx][ev_idx][step_idx],
+                                    events.elevations[item_idx][ev_idx][step_idx],
                                     events.elevations_unit)
                         if valid_distances:
                             if self.task_config["spatial_projection"] in (
@@ -193,23 +219,98 @@ class ExtractSpatialEventsMetadata(pipeline.ExtractMetadata):
                                 dist = 1.0
                             else:
                                 dist = units_util.norm_angle(
-                                    events.elevations[label_idx][ev_idx][step_idx],
+                                    events.elevations[item_idx][ev_idx][step_idx],
                                     events.elevations_unit)
 
-                        row = (t_start, t_end, ev_idx, label) \
-                            + opt_tuple(azi, valid_azimuths) \
-                            + opt_tuple(ele, valid_elevations) \
+                        row = (
+                            (t_start, t_end, ev_idx, label)
+                            + opt_tuple(track_idx, valid_track_idxs)
+                            + opt_tuple(azi, valid_azimuths)
+                            + opt_tuple(ele, valid_elevations)
                             + opt_tuple(dist, valid_distances)
+                        )
 
-                        metadata.append(row)
+                        if not self.skip_row(
+                            t_start=t_start,
+                            t_end=t_end,
+                            clip_id=clip_id,
+                            label=label,
+                            item_idx=item_idx,
+                            ev_idx=ev_idx,
+                            step_idx=step_idx,
+                            track_idx=track_idx,
+                        ):
+                            metadata.append(row)
 
-            metadata = pd.DataFrame(metadata,
-                columns=["start", "end", "eventidx", "label"]
-                        + opt_list("azimuth", valid_azimuths) \
-                        + opt_list("elevation", valid_azimuths) \
-                        + opt_list("distance", valid_distances) \
-                        ,
-            ).assign(relpath=str(relpath), split=split)
+            metadata = pd.DataFrame(metadata, columns=column_names).assign(
+                relpath=str(relpath), split=split
+            )
+            metadatas.append(metadata)
+
+        metadata = pd.concat(metadatas)
+        return metadata
+
+
+class ExtractEventMetadata(ExtractSoundataMetadata):
+    def get_requires_metadata(self, split: str) -> pd.DataFrame:
+        logger.info(f"Preparing metadata for {split}")
+
+        # Start and end times are in milliseconds
+        dataset = self.requires()[split].dataset
+
+        valid_track_idxs = self.task_config["multitrack"]
+
+        column_names = (
+            ["start", "end", "label"]
+            + opt_list("trackidx", valid_track_idxs)
+        )
+
+        metadatas = []
+        for clip_id in dataset.clip_ids:
+            # First try and filter by clip id so we don't have to load anns
+            if self.skip_clip_id(clip_id, split):
+                continue
+            clip = dataset.clip(clip_id)
+            if self.skip_clip(clip, split):
+                continue
+
+            events = clip.events
+            relpath = clip.get_path("audio")
+            num_items = len(events.labels)
+
+            track_idx_list = getattr(
+                events,
+                "track_number_indices",
+                ["0"] * num_items
+            )
+            
+            metadata = []
+            for ev_idx, (t_start, t_end) in enumerate(events.intervals):
+                t_start, t_end = (
+                    units_util.norm_time(t, events.intervals_unit)
+                    for t in (t_start, t_end)
+                )
+                label = events.labels[ev_idx]
+                track_idx = track_idx_list[ev_idx]
+                        
+                row = (
+                    (t_start, t_end, label) 
+                    + opt_tuple(track_idx, valid_track_idxs)
+                )
+
+                if not self.skip_row(
+                    t_start=t_start,
+                    t_end=t_end,
+                    clip_id=clip_id,
+                    ev_idx=ev_idx,
+                    track_idx=track_idx,
+                    label=label,
+                ):
+                    metadata.append(row)
+
+            metadata = pd.DataFrame(metadata, columns=column_names).assign(
+                relpath=str(relpath), split=split
+            )
             metadatas.append(metadata)
 
         metadata = pd.concat(metadatas)

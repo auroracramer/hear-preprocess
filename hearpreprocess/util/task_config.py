@@ -123,7 +123,13 @@ def validate_generic_task_config(
             "version": str,
             "embedding_type": Or("scene", "event", str),
             "prediction_type": Or("multiclass", "multilabel", "seld", str),
-            "split_mode": Or("trainvaltest", "presplit_kfold", "new_split_kfold"),
+            "split_mode": Or(
+                "trainvaltest",
+                "stratified_trainvaltest",
+                "presplit_kfold",
+                "new_split_kfold",
+                "new_split_stratified_k_fold",
+            ),
             # When the sample duration is None, the original audio is retained
             # without any trimming and padding
             "sample_duration": Or(float, int, None),
@@ -133,6 +139,16 @@ def validate_generic_task_config(
 
         # Constrain channel formats based on prediction type
         if "prediction_type" in task_config and task_config["prediction_type"] == "seld":
+            schema.update(
+                {
+                    "in_channel_format": Or("stereo", "foa"),
+                    # Spatial projection used for targets
+                    "spatial_projection": Or(
+                        "unit_sphere", "unit_xy_disc", "unit_yz_disc", str
+                    ),
+                }
+            )
+        elif "prediction_type" in task_config and task_config["prediction_type"] == "seld":
             schema.update(
                 {
                     "in_channel_format": Or("stereo", "foa"),
@@ -191,6 +207,7 @@ def validate_generic_task_config(
                             }
                         ]
                     ),
+                    "soundata_multitrack": bool,
                 }
             )
             if "prediction_type" in task_config and task_config["prediction_type"] == "seld":
@@ -235,7 +252,7 @@ def validate_generic_task_config(
                 }
             )
         # SPLIT Mode specific keys
-        if split_mode == "trainvaltest":
+        if split_mode in ["trainvaltest", "new_stratified_trainvaltest"]:
             schema.update(
                 {
                     # max_task_duration_by_split duration is a dict specifying
@@ -265,7 +282,7 @@ def validate_generic_task_config(
                 schema["max_task_duration_by_split"] = Schema(
                     {split: None for split in SPLITS}
                 )
-        elif split_mode in ["presplit_kfold", "new_split_kfold"]:
+        elif split_mode in ["presplit_kfold", "new_split_kfold", "new_split_stratified_kfold"]:
 
             assert (
                 "nfolds" in task_config
@@ -297,6 +314,18 @@ def validate_generic_task_config(
                 schema["max_task_duration_by_fold"] = None
         else:
             raise ValueError("Invalid split_mode")
+
+        if split_mode in ("stratified_trainvaltest", "new_split_stratified_kfold"):
+            schema.update(
+                {
+                    "stratify_fields": [str]
+                }
+            )
+
+        if "stratify_fields" in task_config:
+            assert len(task_config["stratify_fields"]) > 0, (
+                "'stratify_fields' cannot be empty for stratified split modes"
+            )
 
         Schema(schema, ignore_extra_keys=ignore_extra_keys).validate(task_config)
         print("Successfully validated")

@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 from slugify import slugify
 from tqdm import tqdm
+from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 
 import hearpreprocess.util.audio as audio_util
 from hearpreprocess import __version__
@@ -31,6 +32,7 @@ from hearpreprocess.util.luigi import (
     safecopy,
     str2int,
 )
+from hearpreprocess.util.misc import first
 from hearpreprocess.util.spatial import get_spatial_columns
 
 INCLUDE_DATESTR_IN_FINAL_PATHS = False
@@ -316,6 +318,30 @@ class ExtractMetadata(WorkTask):
         """
         return df["unique_filestem"]
 
+    def get_stratify_key(self, df: pd.DataFrame) -> pd.Series:
+        """
+        Gets the stratify key for each audio file.
+
+        A file should only be in one split, i.e. we shouldn't spread
+        file events across splits. This is the default behavior, and
+        the split key is the filename itself.
+        We use unique_filestem because it is fixed for a particular
+        archive.
+        (We could also use datapath.)
+
+        Override: For some corpora:new_split_kfold
+        * An instrument cannot be split (nsynth)
+        * A speaker cannot be split (speech_commands)
+        """
+
+        stratify_key = None
+        for stratify_field in self.task_config["stratify_fields"]:
+            if stratify_key is None:
+                stratify_key = df[stratify_field]
+            else:
+                stratify_key += "-" + df[stratify_field]
+        return stratify_key
+
     def get_requires_metadata(self, requires_key: str) -> pd.DataFrame:
         """
         For a particular key in the task requires (e.g. "train", or "train_eval"),
@@ -325,7 +351,10 @@ class ExtractMetadata(WorkTask):
             * label
             * start, end: Optional
             * eventidx: Optional
+            * trackidx: Optional
             * azimuth, elevation, distance: Optional
+            * azimuthleft, azimuthright, azimuthleftend, azimuthrightend: Optional
+            * city, location_id: Optional
         """
         raise NotImplementedError("Deriving classes need to implement this")
 
@@ -410,9 +439,20 @@ class ExtractMetadata(WorkTask):
         # First, put the metadata into a deterministic order.
         if "start" in metadata.columns:
             columns = ["unique_filestem", "start", "end", "label"]
+
+            if self.task_config.get("multitrack", False):
+                columns += ["trackidx"]
             if self.task_config["prediction_type"] == "seld":
                 # add spatial columns (which should only be for event type)
                 columns += ["eventidx"] + get_spatial_columns(self.task_config)
+            elif self.task_config["prediction_type"] == "avoseld_multiregion":
+                columns += [
+                    "trackidx",
+                    "audioconfirmedevent", "audioconfirmedframe",
+                    "azimuth", "azimuthleft", "azimuthright",
+                    "azimuthend", "azimuthleftend", "azimuthrightend",
+                ]
+
             metadata.sort_values(
                 columns, inplace=True, kind="stable",
             )
@@ -451,8 +491,8 @@ class ExtractMetadata(WorkTask):
                     "Files in the metadata are missing in the directory"
                 )
         return metadata
-
-    def split_train_test_val(self, metadata: pd.DataFrame):
+    
+    def split_train_test_val(self, metadata: pd.DataFrame, stratified: bool = False):
         """
         This functions splits the metadata into test, train and valid from train
         split if any of test or valid split is not found. We split
@@ -549,7 +589,8 @@ class ExtractMetadata(WorkTask):
         # Deterministically sort all unique split_keys.
         split_keys = sorted(metadata[metadata.split == "train"]["split_key"].unique())
         # Deterministically shuffle all unique split_keys.
-        rng = random.Random("split_train_test_val")
+        rng_seed = "split_train_test_val"
+        rng = random.Random(rng_seed)
         rng.shuffle(split_keys)
         n = len(split_keys)
 
@@ -557,8 +598,26 @@ class ExtractMetadata(WorkTask):
         n_test = int(round(n * test_percentage / 100))
         assert n_valid > 0 or valid_percentage == 0
         assert n_test > 0 or test_percentage == 0
-        valid_split_keys = set(split_keys[:n_valid])
-        test_split_keys = set(split_keys[n_valid : n_valid + n_test])
+        if not stratified:
+            valid_split_keys = set(split_keys[:n_valid])
+            test_split_keys = set(split_keys[n_valid : n_valid + n_test])
+        else:
+            stratify_keys = self.get_stratify_key(metadata)
+            n_eval = n_valid + n_test
+            
+            # Get stratified train/eval split
+            sss_train_eval = StratifiedShuffleSplit(n_splits=1, test_size=n_eval, random_state=rng_seed)
+            _, eval_idxs = first(sss_train_eval.split(split_keys, stratify_keys))
+            eval_split_keys = split_keys[eval_idxs]
+            eval_stratify_keys = stratify_keys[eval_idxs]
+
+            # From eval split, get stratified valid/test split
+            sss_valid_test = StratifiedShuffleSplit(n_splits=1, test_size=n_test, random_state=rng_seed)
+            valid_idxs, test_idxs = first(sss_valid_test.split(eval_split_keys, eval_stratify_keys))
+
+            valid_split_keys = eval_split_keys[valid_idxs]
+            test_split_keys = eval_split_keys[test_idxs]
+
         metadata.loc[metadata["split_key"].isin(valid_split_keys), "split"] = "valid"
         metadata.loc[metadata["split_key"].isin(test_split_keys), "split"] = "test"
         return metadata
@@ -575,7 +634,7 @@ class ExtractMetadata(WorkTask):
                 f"Received: {metadata['split'].unique()}."
             )
 
-    def split_k_folds(self, metadata: pd.DataFrame):
+    def split_k_folds(self, metadata: pd.DataFrame, stratified: bool = False):
         """
         Deterministically split dataset into k-folds
         """
@@ -600,7 +659,16 @@ class ExtractMetadata(WorkTask):
 
             # Equally split the split_keys into k folds and label accordingly
             k_folds = self.task_config["nfolds"]
-            folds_keys = np.array_split(shuffled_split_keys, k_folds)
+            if not stratified:
+                folds_keys = np.array_split(shuffled_split_keys, k_folds)
+            else:
+                stratify_keys = self.get_stratify_key(metadata)
+                kf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
+                folds_keys = [
+                    shuffled_split_keys[fold_idxs]
+                    for _, fold_idxs in kf.split(shuffled_split_keys, stratify_keys)
+                ]
+
             for j, fold in enumerate(folds_keys):
                 metadata.loc[metadata["split_key"].isin(fold), "split"] = f"fold{j:02d}"
 
@@ -642,6 +710,17 @@ class ExtractMetadata(WorkTask):
             if set(self.task_config["splits"]) != set(SPLITS):
                 raise AssertionError(f"Splits for trainvaltest mode must be {SPLITS}")
             metadata = self.split_train_test_val(metadata)
+        elif self.task_config["split_mode"] == "stratified_trainvaltest":
+            # Split the metadata to create valid and test set from train if
+            # they are not created explicitly in get_all_metadata
+            if set(self.task_config["splits"]) != set(SPLITS):
+                raise AssertionError(f"Splits for trainvaltest mode must be {SPLITS}")
+            for k in self.task_config["stratify_fields"]:
+                if not k in metadata.keys():
+                    raise AssertionError(
+                        f"Stratify field {k} not found in metadata columns"
+                    )
+            metadata = self.split_train_test_val(metadata, stratified=True)
         elif self.task_config["split_mode"] == "presplit_kfold":
             # Splits are the predefined folds in the dataset - just make sure the
             # names are correct
@@ -649,6 +728,15 @@ class ExtractMetadata(WorkTask):
         elif self.task_config["split_mode"] == "new_split_kfold":
             # Split the dataset into k-folds
             metadata = self.split_k_folds(metadata)
+            self.assert_correct_kfolds(metadata)
+        elif self.task_config["split_mode"] == "new_split_stratified_kfold":
+            for k in self.task_config["stratify_fields"]:
+                if not k in metadata.keys():
+                    raise AssertionError(
+                        f"Stratify field {k} not found in metadata columns"
+                    )
+            # Split the dataset into k-folds
+            metadata = self.split_k_folds(metadata, stratified=True)
             self.assert_correct_kfolds(metadata)
         else:
             raise ValueError("Unknown split_mode received in task_config")
@@ -702,8 +790,22 @@ class ExtractMetadata(WorkTask):
             assert "end" in df.columns
         if self.task_config["prediction_type"] == "seld":
             assert "eventidx" in df.columns
+            assert (
+                not self.task_config.get("multitrack")
+                or "trackidx" in df.columns
+            )
             for col in get_spatial_columns(self.task_config):
                 assert col in df.columns
+        if self.task_config["prediction_type"] == "avoseld_multiregion":
+            assert "trackidx" in df.columns
+            assert "audioconfirmedevent" in df.columns
+            assert "audioconfirmedframe" in df.columns
+            assert "azimuth" in df.columns
+            assert "azimuthleft" in df.columns
+            assert "azimuthright" in df.columns
+            assert "azimuthend" in df.columns
+            assert "azimuthleftend" in df.columns
+            assert "azimuthrightend" in df.columns
         return df
 
     def run(self):

@@ -19,6 +19,7 @@ import hearpreprocess.spoken_digit as spoken_digit
 import hearpreprocess.tfds_speech_commands as tfds_speech_commands
 import hearpreprocess.soundata_tau2021sse_nigens as soundata_taus2021sse_nigens
 import hearpreprocess.soundata_tau2021sse_nigens_xy as soundata_taus2021sse_nigens_xy
+import hearpreprocess.urbansas as urbansas
 from hearpreprocess.util.task_config import validate_generic_task_config
 
 logger = logging.getLogger("luigi-interface")
@@ -47,6 +48,7 @@ tasks = {
     "spoken_digit": [spoken_digit],
     "soundata_tau2021sse_nigens": [soundata_taus2021sse_nigens],
     "soundata_tau2021sse_nigens_xy": [soundata_taus2021sse_nigens_xy],
+    "urbansas": [urbansas],
     "open": [
         speech_commands,
         nsynth_pitch,
@@ -66,6 +68,7 @@ tasks = {
     "spatial": [
         soundata_taus2021sse_nigens,
         soundata_taus2021sse_nigens_xy,
+        urbansas,
     ],
     "all": [
         speech_commands,
@@ -103,7 +106,7 @@ tasks = {
     "--channel-format",
     default=None,
     help="Perform spatial reformatting only to this format. "
-    "By default, for spatial tasks (seld) we format to stereo "
+    "By default, for spatial tasks we format to stereo "
     "and for all other tasks we format to mono.",
     type=str,
 )
@@ -183,7 +186,7 @@ def run(
                 raise ValueError(f"mode {mode} unknown")
 
             if channel_format is None:
-                if task_module.generic_task_config["prediction_type"] == "seld":
+                if task_module.generic_task_config["prediction_type"] in ("seld", "avoseld_multiregion"):
                     channel_formats = ["stereo"]
                 else:
                     channel_formats = ["mono"]
@@ -213,6 +216,9 @@ def run(
                     task_config["vst3_paths"] = {
                         "IEM/BinauralDecoder": vst3_foa2bin_path
                     }
+                elif task_module.generic_task_config["prediction_type"] == "avoseld_multiregion":
+                    assert task_module.generic_task_config["in_channel_format"] not in ("mono", "mixed_mono_stereo")
+
 
                 # The `splits` key has to be initialised outside the pipeline,
                 # since the splits are used in defining the required tasks
