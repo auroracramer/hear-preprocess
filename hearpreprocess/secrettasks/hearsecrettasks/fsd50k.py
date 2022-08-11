@@ -28,6 +28,7 @@ generic_task_config = {
     "embedding_type": "scene",
     # One file can have multiple labels
     "prediction_type": "multilabel",
+    "multitrack": False,
     "split_mode": "trainvaltest",
     # Paper Link - https://arxiv.org/pdf/2010.00475.pdf
     # Page 12 Discussion B Section 1 -

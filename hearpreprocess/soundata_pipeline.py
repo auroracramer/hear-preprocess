@@ -19,7 +19,6 @@ import luigi
 import pandas as pd
 import soundata
 import soundata.core
-import intervaltree
 
 import hearpreprocess.pipeline as pipeline
 import hearpreprocess.util.luigi as luigi_util
@@ -123,6 +122,16 @@ class ExtractSoundataMetadata(pipeline.ExtractMetadata):
     def skip_row(self, **kwargs):
         # Override to filter specific rows within a clip, specifying args
         return False
+
+    @staticmethod
+    def convert_column_to_idxs(df: pd.DataFrame, column: str) -> pd.DataFrame:
+        # Ensure track idxs are ints starting from 0
+        df = df.copy()
+        unique_vals = sorted(df[column].unique().to_list())
+        for track_idx, val in enumerate(unique_vals):
+            df[df[column] == val] = track_idx
+        df[column] = df[column].astype(int)
+        return df
 
 
 
@@ -248,6 +257,8 @@ class ExtractSpatialEventsMetadata(ExtractSoundataMetadata):
             metadatas.append(metadata)
 
         metadata = pd.concat(metadatas)
+        if valid_track_idxs:
+            metadata = self.convert_column_to_idxs(metadata, "trackidx")
         return metadata
 
 
@@ -314,4 +325,6 @@ class ExtractEventMetadata(ExtractSoundataMetadata):
             metadatas.append(metadata)
 
         metadata = pd.concat(metadatas)
+        if valid_track_idxs:
+            metadata = self.convert_column_to_idxs(metadata, "trackidx")
         return metadata

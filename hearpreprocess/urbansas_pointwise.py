@@ -19,19 +19,21 @@ from hearpreprocess.pipeline import (
     DownloadCorpus,
     ExtractArchive,
 )
+from hearpreprocess.util.misc import opt_list, opt_tuple
 
 logger = logging.getLogger("luigi-interface")
 
 generic_task_config = {
     # Define the task name and the version
-    "task_name": "urbansas",
+    "task_name": "urbansas_pointwise",
     "version": "hear2021-ext",
     "embedding_type": "event", # we'll only support "event" for seld
-    "prediction_type": "avoseld_multilabel",
+    "prediction_type": "avoseld_multiregion",
     "split_mode": "new_stratified_kfold",
     "stratify_fields": ["location_id"],
     "sample_duration": 10.0,
-    "evaluation": ["horiz_iou"],
+    "evaluation": ["horiz_iou_120fov_5regions_pointwise"],
+    "spatial_projection": "video_azimuth_region_pointwise",
     # This task uses tfds which doesn't require the download paths,
     # but rather the tfds dataset name and version. For speech commands
     # the tf dataset has all the splits, and so we will not be
@@ -62,6 +64,13 @@ generic_task_config = {
         },
         "full": {
             "max_task_duration_by_fold": None,
+        },
+    },
+    "evaluation_params": {
+        "event_postprocessing_grid": {
+            # In preliminary tests, these smoothing parameters worked
+            # well at optimizing onset fms.
+            "threshold_multitrack_unify": 30,
         },
     },
 }
@@ -164,7 +173,7 @@ class ExtractMetadata(pipeline.ExtractMetadata):
         prediction_type = self.task_config["prediction_type"]
         assert prediction_type in ("avoseld_multiregion", "multilabel"),(
             f"prediction_type must be in "
-            f"('avoseld_multiacitveregion', 'multilabel', "
+            f"('avoseld_multiregion', 'multilabel', "
             f"but got {prediction_type}"
         )
 
@@ -202,12 +211,14 @@ class ExtractMetadata(pipeline.ExtractMetadata):
                 metadata = df_audio_file[["start", "end", "label"]]
 
             elif prediction_type == "avoseld_multiregion":
-                columns = [
-                    "start", "end", "trackidx", "label",
-                    "azimuth", "azimuthleft", "azimuthright",
-                    "azimuthend", "azimuthleftend", "azimuthrightend",
-                    "audioconfirmedevent", "audioconfirmedframe",
-                ]
+                pointwise = self.task_config["spatial_projection"] == "video_azimuth_region_pointwise"
+                boxwise = self.task_config["spatial_projection"] == "video_azimuth_region_boxwise"
+                columns = (
+                    ["start", "end", "trackidx", "label"]
+                    + opt_list("azimuth", pointwise)
+                    + opt_list("azimuthleft", boxwise)
+                    + opt_list("azimuthright", boxwise)
+                )
                 # Audio-visual object localization and detection
                 df_video_file = df_video[df_video['filename'] == filename]
 
@@ -247,15 +258,18 @@ class ExtractMetadata(pipeline.ExtractMetadata):
                     label = ods["label"]
                     # Check if video event is confirmed by audio.
                     # This is true if at least half the timestamp from video labels are included in audio regions
-                    confirmed = [
+                    confirmed_list = [
                         any((t >= aev['start'] and t <= aev['end']) and
                             aev['label'] == event_dict['label']
                             for aev in audio_events_list)
                         for t in event_dict['time']
                     ]
 
-                    audio_confirmed_event = bool(np.mean(confirmed) > 0)                                                                                             
-                    for idx, c in enumerate(confirmed):
+                    audio_confirmed_event = bool(np.mean(confirmed_list) > 0)                                                                                             
+                    for idx, confirmed in enumerate(confirmed_list):
+                        # Skip unconfirmed
+                        if not confirmed:
+                            continue
                         
                         time = event_dict["time"][idx]
                         azimuth = event_dict["azimuth"][idx]
@@ -265,24 +279,19 @@ class ExtractMetadata(pipeline.ExtractMetadata):
 
                         # Define start time to be the frame time
                         start = time
+                        
                         # Define end time to be the next event-track frame
-                        if idx < (len(confirmed) - 1):
+                        if idx < (len(confirmed_list) - 1):
                             end = event_dict["time"][idx+1]
-                            azimuth_end = event_dict["azimuth"][idx+1]
-                            azimuth_left_end = event_dict["azimuth_left"][idx+1]
-                            azimuth_right_end = event_dict["azimuth_right"][idx+1]
                         else:
                             # or the same time if this is the last frame
                             end = time
-                            azimuth_end = azimuth
-                            azimuth_left_end = azimuth_left
-                            azimuth_right_end = azimuth_right
 
                         row = (
-                            start, end, track_id, label,
-                            azimuth, azimuth_left, azimuth_right,
-                            azimuth_end, azimuth_left_end, azimuth_right_end,
-                            audio_confirmed_event, audio_confirmed_frame,
+                            (start, end, track_id, label)
+                            + opt_tuple(azimuth, pointwise)
+                            + opt_tuple(azimuth_left, pointwise)
+                            + opt_tuple(azimuth_right, pointwise)
                         )
                             
                         metadata.append(row)

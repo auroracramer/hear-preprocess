@@ -122,7 +122,7 @@ def validate_generic_task_config(
             "task_name": str,
             "version": str,
             "embedding_type": Or("scene", "event", str),
-            "prediction_type": Or("multiclass", "multilabel", "seld", str),
+            "prediction_type": Or("multiclass", "multilabel", "seld", "avoseld_multiregion", str),
             "split_mode": Or(
                 "trainvaltest",
                 "stratified_trainvaltest",
@@ -144,18 +144,25 @@ def validate_generic_task_config(
                     "in_channel_format": Or("stereo", "foa"),
                     # Spatial projection used for targets
                     "spatial_projection": Or(
-                        "unit_sphere", "unit_xy_disc", "unit_yz_disc", str
+                        "unit_sphere",
+                        "unit_xy_disc",
+                        "unit_yz_disc",
+                        str,
                     ),
+                    "multitrack": bool,
                 }
             )
-        elif "prediction_type" in task_config and task_config["prediction_type"] == "seld":
+        elif "prediction_type" in task_config and task_config["prediction_type"] == "avoseld_multiregion":
             schema.update(
                 {
-                    "in_channel_format": Or("stereo", "foa"),
-                    # Spatial projection used for targets
+                    "in_channel_format": "stereo",
+                    "fov": float,
+                    "num_regions": int,
                     "spatial_projection": Or(
-                        "unit_sphere", "unit_xy_disc", "unit_yz_disc", str
-                    ),
+                        "video_azimuth_region_pointwise",
+                        "video_azimuth_region_boxwise",
+                        str,
+                    )
                 }
             )
         else:
@@ -166,6 +173,20 @@ def validate_generic_task_config(
                         Or("mono", "stereo", "mixed_mono_stereo", "foa"),
                         default="mixed_mono_stereo"
                     ),
+                }
+            )
+
+        if "prediction_type" in task_config and task_config["prediction_type"] in ("multilabel", "seld"):
+            schema.update(
+                {
+                    "multitrack": bool,
+                }
+            )
+
+        if "multitrack" in task_config and task_config["multitrack"]:
+            schema.update(
+                {
+                    "num_tracks": int,
                 }
             )
 
@@ -207,7 +228,6 @@ def validate_generic_task_config(
                             }
                         ]
                     ),
-                    "soundata_multitrack": bool,
                 }
             )
             if "prediction_type" in task_config and task_config["prediction_type"] == "seld":

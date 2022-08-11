@@ -30,6 +30,7 @@ generic_task_config = {
     "version": "v3.0.0",
     "embedding_type": "event",
     "prediction_type": "multilabel",
+    "multitrack": False,
     "split_mode": "new_split_kfold",
     "nfolds": 5,
     # |train_test_valid| - 75th %tile: 686.33, 90th %tile: |1150.26|, max: 2628.99

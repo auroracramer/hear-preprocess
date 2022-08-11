@@ -32,7 +32,7 @@ from hearpreprocess.util.luigi import (
     safecopy,
     str2int,
 )
-from hearpreprocess.util.misc import first
+from hearpreprocess.util.misc import first, opt_list
 from hearpreprocess.util.spatial import get_spatial_columns
 
 INCLUDE_DATESTR_IN_FINAL_PATHS = False
@@ -353,7 +353,7 @@ class ExtractMetadata(WorkTask):
             * eventidx: Optional
             * trackidx: Optional
             * azimuth, elevation, distance: Optional
-            * azimuthleft, azimuthright, azimuthleftend, azimuthrightend: Optional
+            * azimuthleft, azimuthright: Optional
             * city, location_id: Optional
         """
         raise NotImplementedError("Deriving classes need to implement this")
@@ -446,12 +446,14 @@ class ExtractMetadata(WorkTask):
                 # add spatial columns (which should only be for event type)
                 columns += ["eventidx"] + get_spatial_columns(self.task_config)
             elif self.task_config["prediction_type"] == "avoseld_multiregion":
-                columns += [
-                    "trackidx",
-                    "audioconfirmedevent", "audioconfirmedframe",
-                    "azimuth", "azimuthleft", "azimuthright",
-                    "azimuthend", "azimuthleftend", "azimuthrightend",
-                ]
+                pointwise = self.task_config["spatial_projection"] == "video_azimuth_region_pointwise"
+                boxwise = self.task_config["spatial_projection"] == "video_azimuth_region_boxwise"
+                columns += (
+                    ["trackidx"]
+                    + opt_list("azimuth", pointwise)
+                    + opt_list("azimuthleft", boxwise)
+                    + opt_list("azimuthright", boxwise)
+                )
 
             metadata.sort_values(
                 columns, inplace=True, kind="stable",
@@ -798,14 +800,11 @@ class ExtractMetadata(WorkTask):
                 assert col in df.columns
         if self.task_config["prediction_type"] == "avoseld_multiregion":
             assert "trackidx" in df.columns
-            assert "audioconfirmedevent" in df.columns
-            assert "audioconfirmedframe" in df.columns
-            assert "azimuth" in df.columns
-            assert "azimuthleft" in df.columns
-            assert "azimuthright" in df.columns
-            assert "azimuthend" in df.columns
-            assert "azimuthleftend" in df.columns
-            assert "azimuthrightend" in df.columns
+            if self.task_config["spatial_projection"] == "video_azimuth_region_pointwise":
+                assert "azimuth" in df.columns
+            if self.task_config["spatial_projection"] == "video_azimuth_region_boxwise":
+                assert "azimuthleft" in df.columns
+                assert "azimuthright" in df.columns
         return df
 
     def run(self):

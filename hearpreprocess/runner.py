@@ -19,7 +19,8 @@ import hearpreprocess.spoken_digit as spoken_digit
 import hearpreprocess.tfds_speech_commands as tfds_speech_commands
 import hearpreprocess.soundata_tau2021sse_nigens as soundata_taus2021sse_nigens
 import hearpreprocess.soundata_tau2021sse_nigens_xy as soundata_taus2021sse_nigens_xy
-import hearpreprocess.urbansas as urbansas
+import hearpreprocess.urbansas_pointwise as urbansas_pointwise
+import hearpreprocess.urbansas_boxwise as urbansas_boxwise
 from hearpreprocess.util.task_config import validate_generic_task_config
 
 logger = logging.getLogger("luigi-interface")
@@ -68,7 +69,8 @@ tasks = {
     "spatial": [
         soundata_taus2021sse_nigens,
         soundata_taus2021sse_nigens_xy,
-        urbansas,
+        urbansas_pointwise,
+        urbansas_boxwise,
     ],
     "all": [
         speech_commands,
@@ -78,6 +80,8 @@ tasks = {
         spoken_digit,
         soundata_taus2021sse_nigens,
         soundata_taus2021sse_nigens_xy,
+        urbansas_pointwise,
+        urbansas_boxwise,
     ]
     + secret_tasks.get("all-secret", []),
     # Add the task config for the secrets task if the secret task config was found.
@@ -216,8 +220,6 @@ def run(
                     task_config["vst3_paths"] = {
                         "IEM/BinauralDecoder": vst3_foa2bin_path
                     }
-                elif task_module.generic_task_config["prediction_type"] == "avoseld_multiregion":
-                    assert task_module.generic_task_config["in_channel_format"] not in ("mono", "mixed_mono_stereo")
 
 
                 # The `splits` key has to be initialised outside the pipeline,

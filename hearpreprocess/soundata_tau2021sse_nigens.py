@@ -20,6 +20,8 @@ generic_task_config = {
     "version": "hear2021-ext",
     "embedding_type": "event", # we'll only support "event" for seld
     "prediction_type": "seld",
+    "multitrack": True,
+    "num_tracks": 3,
     "split_mode": "trainvaltest",
     "sample_duration": 60.0,
     "evaluation": ["segment_1s_seld"],
@@ -39,6 +41,7 @@ generic_task_config = {
         "elevation": True,
         "distance": False
     },
+    "soundata_metadata_clip_attrs": ["location_id"], 
     "soundata_splits": [
         {
             "split": "train",

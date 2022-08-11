@@ -27,6 +27,7 @@ generic_task_config = {
     "version": "hear2021",
     "embedding_type": "event",
     "prediction_type": "multilabel",
+    "multitrack": False,
     "split_mode": "trainvaltest",
     "sample_duration": 120.0,
     # DCASE2016 task 2 used the segment-based total error rate as
