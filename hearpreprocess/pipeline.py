@@ -608,13 +608,13 @@ class ExtractMetadata(WorkTask):
             n_eval = n_valid + n_test
             
             # Get stratified train/eval split
-            sss_train_eval = StratifiedShuffleSplit(n_splits=1, test_size=n_eval, random_state=rng_seed)
+            sss_train_eval = StratifiedShuffleSplit(n_splits=1, test_size=n_eval, random_state=str2int(rng_seed))
             _, eval_idxs = first(sss_train_eval.split(split_keys, stratify_keys))
             eval_split_keys = split_keys[eval_idxs]
             eval_stratify_keys = stratify_keys[eval_idxs]
 
             # From eval split, get stratified valid/test split
-            sss_valid_test = StratifiedShuffleSplit(n_splits=1, test_size=n_test, random_state=rng_seed)
+            sss_valid_test = StratifiedShuffleSplit(n_splits=1, test_size=n_test, random_state=str2int(rng_seed))
             valid_idxs, test_idxs = first(sss_valid_test.split(eval_split_keys, eval_stratify_keys))
 
             valid_split_keys = eval_split_keys[valid_idxs]
@@ -665,7 +665,7 @@ class ExtractMetadata(WorkTask):
                 folds_keys = np.array_split(shuffled_split_keys, k_folds)
             else:
                 stratify_keys = self.get_stratify_key(metadata)
-                kf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
+                kf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=str2int(seed))
                 folds_keys = [
                     shuffled_split_keys[fold_idxs]
                     for _, fold_idxs in kf.split(shuffled_split_keys, stratify_keys)
