@@ -45,6 +45,7 @@ generic_task_config = {
     "frame_width": 1024, # NEED TO CHECK THISSSS
     "index_max_box_only": False,
     "num_regions": 5,
+    "filter_confirmed": True, # bool or float in [0, 1]
     "download_urls": [
         {
             "name": "audio",
@@ -172,6 +173,7 @@ class ExtractMetadata(pipeline.ExtractMetadata):
         frame_width = self.task_config["frame_width"]
         index_max_box_only = self.task_config["index_max_box_only"]
         prediction_type = self.task_config["prediction_type"]
+        filter_confirmed = self.task_config["filter_confirmed"]
         assert prediction_type in ("avoseld_multiregion", "multilabel"),(
             f"prediction_type must be in "
             f"('avoseld_multiregion', 'multilabel', "
@@ -266,7 +268,22 @@ class ExtractMetadata(pipeline.ExtractMetadata):
                         for t in event_dict['time']
                     ]
 
-                    audio_confirmed_event = bool(np.mean(confirmed_list) > 0)                                                                                             
+                    # https://github.com/magdalenafuentes/urbansas/blob/main/data/BatchRawDataset.py#L192
+                    confirmed_ratio = np.mean(confirmed_list)
+                    if isinstance(filter_confirmed, (float, int)):
+                        if (confirmed_ratio <= filter_confirmed):
+                            continue
+                    elif isinstance(filter_confirmed, bool):
+                        # If bool, confirmation just requires at least one
+                        # frame to be audio-confirmed
+                        if filter_confirmed and (confirmed_ratio == 0):
+                            continue
+                    else:
+                        raise ValueError(
+                            f"filter_confirmed must be numeric or bool, but "
+                            f"got {type(filter_confirmed).__name__}"
+                        )
+
                     for idx, confirmed in enumerate(confirmed_list):
                         # Skip unconfirmed
                         if not confirmed:
@@ -276,7 +293,6 @@ class ExtractMetadata(pipeline.ExtractMetadata):
                         azimuth = event_dict["azimuth"][idx]
                         azimuth_left = event_dict["azimuth_left"][idx]
                         azimuth_right = event_dict["azimuth_right"][idx]
-                        audio_confirmed_frame = c
 
                         # Define start time to be the frame time
                         start = time
