@@ -128,7 +128,7 @@ def validate_generic_task_config(
                 "stratified_trainvaltest",
                 "presplit_kfold",
                 "new_split_kfold",
-                "new_split_stratified_k_fold",
+                "new_split_stratified_kfold",
             ),
             # When the sample duration is None, the original audio is retained
             # without any trimming and padding
@@ -272,7 +272,7 @@ def validate_generic_task_config(
                 }
             )
         # SPLIT Mode specific keys
-        if split_mode in ["trainvaltest", "new_stratified_trainvaltest"]:
+        if split_mode in ["trainvaltest", "stratified_trainvaltest"]:
             schema.update(
                 {
                     # max_task_duration_by_split duration is a dict specifying
