@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from slugify import slugify
 
 import hearpreprocess.pipeline as pipeline
+import hearpreprocess.util.units as units_util
 from hearpreprocess.pipeline import (
     TRAIN_PERCENTAGE,
     TRAINVAL_PERCENTAGE,
@@ -149,6 +150,10 @@ def process_video_track(track_df, fov=None, frame_width=None) -> pd.Series:
     return track_ds
 
 
+def is_number(x) -> bool:
+    return isinstance(x, (float, int)) and not isinstance(x, bool)
+
+
 class ExtractMetadata(pipeline.ExtractMetadata):
     audio = luigi.TaskParameter()
     annotations = luigi.TaskParameter()
@@ -244,7 +249,7 @@ class ExtractMetadata(pipeline.ExtractMetadata):
                 audio_events_list = []
                 file_meta = {}
                 for _, ods in df_audio_file.iterrows():
-                    if ods['label'] != -1:
+                    if str(ods['label']) == "-1":
                         audio_events_list.append({
                             'label': ods['label'],
                             'start': ods['start'],
@@ -270,7 +275,7 @@ class ExtractMetadata(pipeline.ExtractMetadata):
 
                     # https://github.com/magdalenafuentes/urbansas/blob/main/data/BatchRawDataset.py#L192
                     confirmed_ratio = np.mean(confirmed_list)
-                    if isinstance(filter_confirmed, (float, int)):
+                    if is_number(filter_confirmed):
                         if (confirmed_ratio <= filter_confirmed):
                             continue
                     elif isinstance(filter_confirmed, bool):
@@ -304,6 +309,10 @@ class ExtractMetadata(pipeline.ExtractMetadata):
                             # or the same time if this is the last frame
                             end = time
 
+                        t_start, t_end = (
+                            units_util.norm_time(t, "seconds")
+                            for t in (t_start, t_end)
+                        )
                         row = (
                             (start, end, track_id, label)
                             + opt_tuple(azimuth, pointwise)
