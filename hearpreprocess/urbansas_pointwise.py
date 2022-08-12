@@ -155,7 +155,7 @@ class ExtractMetadata(pipeline.ExtractMetadata):
     def requires(self):
         return {
             "audio": self.audio,
-            "annotations": self.ground_truth,
+            "annotations": self.annotations,
         }
 
     def get_requires_metadata(self, requires_key: str) -> pd.DataFrame:
