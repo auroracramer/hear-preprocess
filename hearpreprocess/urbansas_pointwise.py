@@ -163,10 +163,10 @@ class ExtractMetadata(pipeline.ExtractMetadata):
         logger.info(f"Preparing metadata")
         # Largely copied from: https://github.com/magdalenafuentes/urbansas/blob/main/index/audio_visual_dataset.py
 
-        audio_dir = self.requires()["audio"].output_path
-        annotations_dir = self.requires()["annotations"].output_path
-        audio_metadata_path = os.path.join(annotations_dir, "audio_annotations.csv")
-        video_metadata_path = os.path.join(annotations_dir, "video_annotations.csv")
+        audio_dir = self.requires()["audio"].output_path.joinpath("audio")
+        annotations_dir = self.requires()["annotations"].output_path.joinpath("annotations")
+        audio_metadata_path = annotations_dir.joinpath("audio_annotations.csv")
+        video_metadata_path = annotations_dir.joinpath("video_annotations.csv")
 
         fov = self.task_config["fov"]
         frame_width = self.task_config["frame_width"]
