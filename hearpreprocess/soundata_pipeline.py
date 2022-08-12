@@ -129,7 +129,7 @@ class ExtractSoundataMetadata(pipeline.ExtractMetadata):
         df = df.copy()
         unique_vals = sorted(df[column].unique())
         for track_idx, val in enumerate(unique_vals):
-            df[df[column] == val] = track_idx
+            df[df[column] == val][column] = track_idx
         df[column] = df[column].astype(int)
         return df
 
