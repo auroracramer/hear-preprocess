@@ -127,7 +127,7 @@ class ExtractSoundataMetadata(pipeline.ExtractMetadata):
     def convert_column_to_idxs(df: pd.DataFrame, column: str) -> pd.DataFrame:
         # Ensure track idxs are ints starting from 0
         df = df.copy()
-        unique_vals = sorted(df[column].unique().to_list())
+        unique_vals = sorted(df[column].unique())
         for track_idx, val in enumerate(unique_vals):
             df[df[column] == val] = track_idx
         df[column] = df[column].astype(int)
