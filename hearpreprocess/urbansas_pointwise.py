@@ -30,6 +30,7 @@ generic_task_config = {
     "embedding_type": "event", # we'll only support "event" for seld
     "prediction_type": "avoseld_multiregion",
     "split_mode": "new_split_stratified_kfold",
+    "nfolds": 5,
     "stratify_fields": ["location_id"],
     "sample_duration": 10.0,
     "evaluation": ["horiz_iou_120fov_5regions_pointwise"],
