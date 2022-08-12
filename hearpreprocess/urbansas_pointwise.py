@@ -316,8 +316,8 @@ class ExtractMetadata(pipeline.ExtractMetadata):
                         row = (
                             (start, end, track_id, label)
                             + opt_tuple(azimuth, pointwise)
-                            + opt_tuple(azimuth_left, pointwise)
-                            + opt_tuple(azimuth_right, pointwise)
+                            + opt_tuple(azimuth_left, boxwise)
+                            + opt_tuple(azimuth_right, boxwise)
                         )
                             
                         metadata.append(row)
