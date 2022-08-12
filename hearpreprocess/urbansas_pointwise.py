@@ -311,7 +311,7 @@ class ExtractMetadata(pipeline.ExtractMetadata):
 
                         t_start, t_end = (
                             units_util.norm_time(t, "seconds")
-                            for t in (t_start, t_end)
+                            for t in (start, end)
                         )
                         row = (
                             (start, end, track_id, label)
