@@ -49,7 +49,8 @@ tasks = {
     "spoken_digit": [spoken_digit],
     "soundata_tau2021sse_nigens": [soundata_taus2021sse_nigens],
     "soundata_tau2021sse_nigens_xy": [soundata_taus2021sse_nigens_xy],
-    "urbansas": [urbansas],
+    "urbansas_pointwise": [urbansas_pointwise],
+    "urbansas_boxwise": [urbansas_boxwise],
     "open": [
         speech_commands,
         nsynth_pitch,
