@@ -667,7 +667,7 @@ class ExtractMetadata(WorkTask):
                 stratify_keys = self.get_stratify_key(metadata)
                 kf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=str2int(seed))
                 folds_keys = [
-                    shuffled_split_keys[fold_idxs]
+                    shuffled_split_keys[np.array(fold_idxs, dtype=int)]
                     for _, fold_idxs in kf.split(shuffled_split_keys, stratify_keys)
                 ]
 
