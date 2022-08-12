@@ -229,10 +229,10 @@ def run(
                 if "split_mode" not in task_config:
                     raise ValueError("split_mode is a required config for all tasks")
 
-                if task_config["split_mode"] == "trainvaltest":
+                if task_config["split_mode"] in ["trainvaltest", "stratified_trainvaltest"]:
                     # Dataset will be partitioned into train/validation/test splits
                     task_config["splits"] = pipeline.SPLITS
-                elif task_config["split_mode"] in ["new_split_kfold", "presplit_kfold"]:
+                elif task_config["split_mode"] in ["new_split_kfold", "presplit_kfold", "new_split_stratified_kfold"]:
                     # Dataset will be partitioned in k-folds, either using
                     # predefined folds or with using folds defined in the pipeline
                     n_folds = task_config["nfolds"]
@@ -243,7 +243,7 @@ def run(
                 else:
                     raise ValueError(
                         f"Unknown split_mode received: {task_config['split_mode']}, "
-                        "expected 'trainvaltest, 'new_split_kfold', or 'presplit_kfold'"
+                        "expected 'trainvaltest, 'stratified_trainvaltest, 'new_split_kfold', 'new_split_stratified_kfold', or 'presplit_kfold'"
                     )
 
                 metadata_task = task_module.extract_metadata_task(task_config)  # type: ignore # noqa: E501
