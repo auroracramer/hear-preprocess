@@ -1236,7 +1236,20 @@ class SubcorpusMetadata(MetadataTask):
                 # For event labeling each file will have a list of metadata
                 columns = ["unique_filename", "label", "start", "end"]
                 if self.task_config["prediction_type"] == "seld":
-                    columns += ["eventidx"] + get_spatial_columns(self.task_config)
+                    columns += (
+                        ["eventidx"]
+                        + get_spatial_columns(self.task_config)
+                        + opt_list("trackidx", self.task_config.get("multitrack"))
+                    )
+                elif self.task_config["prediction_type"] == "avoseld_multiregion":
+                    pointwise = self.task_config["spatial_projection"] == "video_azimuth_region_pointwise"
+                    boxwise = self.task_config["spatial_projection"] == "video_azimuth_region_boxwise"
+                    columns += (
+                        ["trackidx"]
+                        + opt_list("azimuth", pointwise)
+                        + opt_list("azimuthleft", boxwise)
+                        + opt_list("azimuthright", boxwise)
+                    )
                 audiolabel_json = (
                     audiolabel_df[columns]
                     .set_index("unique_filename")
