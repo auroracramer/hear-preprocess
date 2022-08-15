@@ -133,7 +133,11 @@ class ExtractSoundataMetadata(pipeline.ExtractMetadata):
         df[column] = df[column].astype(int)
         return df
 
-
+    def get_final_label(self, label):
+        remap_dict = self.task_config.get("soundata_remap_labels", {})
+        new_label = remap_dict.get(str(label))
+        label = new_label or label
+        return label
 
 
 # Define an ExtractMetadata class for each type of metadata
@@ -231,6 +235,7 @@ class ExtractSpatialEventsMetadata(ExtractSoundataMetadata):
                                     events.elevations[item_idx][ev_idx][step_idx],
                                     events.elevations_unit)
 
+                        label = self.get_final_label(label)
                         row = (
                             (t_start, t_end, ev_idx, label)
                             + opt_tuple(track_idx, valid_track_idxs)
@@ -301,7 +306,7 @@ class ExtractEventMetadata(ExtractSoundataMetadata):
                     units_util.norm_time(t, events.intervals_unit)
                     for t in (t_start, t_end)
                 )
-                label = events.labels[ev_idx]
+                label = self.get_final_label(events.labels[ev_idx])
                 track_idx = track_idx_list[ev_idx]
                         
                 row = (

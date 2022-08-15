@@ -228,6 +228,7 @@ def validate_generic_task_config(
                             }
                         ]
                     ),
+                    Optional("soundata_remap_labels"): Schema({str: str}),
                 }
             )
             if "prediction_type" in task_config and task_config["prediction_type"] == "seld":
