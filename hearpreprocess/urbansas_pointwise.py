@@ -5,6 +5,7 @@ import os
 import luigi
 import numpy as np
 import pandas as pd
+from functools import partial
 from pathlib import Path
 from statistics import mode
 from typing import Any, Dict, Set
@@ -43,7 +44,7 @@ generic_task_config = {
     # from tfds builder.
     "in_channel_format": "stereo", # ("mono_stereo", "micarray", "foa")
     "fov": 120.0,
-    "frame_width": 1024, # NEED TO CHECK THISSSS
+    "frame_width": 1280, # NEED TO CHECK THISSSS
     "index_max_box_only": False,
     "num_regions": 5,
     "filter_confirmed": True, # bool or float in [0, 1]
@@ -243,13 +244,14 @@ class ExtractMetadata(pipeline.ExtractMetadata):
 
                 # Determine objects from video
                 df_video_objects = df_video_file.groupby('track_id').apply(
-                    lambda df: process_video_track(df, fov=fov, frame_width=frame_width))
+                    partial(process_video_track, fov=fov, frame_width=frame_width)
+                )
 
                 # Index audio evdents
                 audio_events_list = []
                 file_meta = {}
                 for _, ods in df_audio_file.iterrows():
-                    if str(ods['label']) == "-1":
+                    if str(ods['label']) != "-1":
                         audio_events_list.append({
                             'label': ods['label'],
                             'start': ods['start'],
