@@ -339,7 +339,7 @@ class ExtractMetadata(WorkTask):
         # Note that we require that each split key have a unique set of values
         # for the stratify keys
         df = (
-            df[["split_key"] + self.task_config["stratify_fields"]]
+            df[["split_key"] + list(self.task_config["stratify_fields"])]
                 .drop_duplicates()
                 .set_index("split_key", verify_integrity=True)
         )
