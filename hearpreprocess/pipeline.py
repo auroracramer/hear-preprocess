@@ -10,7 +10,7 @@ import shutil
 import tarfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Sequence, Set, Union
 from urllib.parse import urlparse
 import warnings
 
@@ -318,7 +318,7 @@ class ExtractMetadata(WorkTask):
         """
         return df["unique_filestem"]
 
-    def get_stratify_key(self, df: pd.DataFrame) -> pd.Series:
+    def get_stratify_keys(self, df: pd.DataFrame, split_keys: Sequence[str]) -> pd.Series:
         """
         Gets the stratify key for each audio file.
 
@@ -334,13 +334,21 @@ class ExtractMetadata(WorkTask):
         * A speaker cannot be split (speech_commands)
         """
 
-        stratify_key = None
+        # Only use relevant fields, drop duplicates, and set the index to the 
+        # split key for getting the stratify keys in the correct order later.
+        # Note that we require that each split key have a unique set of values
+        # for the stratify keys
+        df = (
+            df[["split_key"] + self.task_config["stratify_fields"]]
+                .drop_duplicates()
+                .set_index("split_key", verify_integrity=True)
+        )
+        # Build the stratify key from the fields
+        df["stratify_key"] = ""
         for stratify_field in self.task_config["stratify_fields"]:
-            if stratify_key is None:
-                stratify_key = df[stratify_field]
-            else:
-                stratify_key += "-" + df[stratify_field]
-        return stratify_key
+            df["stratify_key"] += "-" + df[stratify_field]
+        # Return the stratify keys ordered by the provided split keys
+        return df.loc[split_keys]["stratify_key"]
 
     def get_requires_metadata(self, requires_key: str) -> pd.DataFrame:
         """
@@ -604,7 +612,7 @@ class ExtractMetadata(WorkTask):
             valid_split_keys = set(split_keys[:n_valid])
             test_split_keys = set(split_keys[n_valid : n_valid + n_test])
         else:
-            stratify_keys = self.get_stratify_key(metadata)
+            stratify_keys = self.get_stratify_keys(metadata, split_keys=split_keys)
             n_eval = n_valid + n_test
             
             # Get stratified train/eval split
@@ -664,7 +672,7 @@ class ExtractMetadata(WorkTask):
             if not stratified:
                 folds_keys = np.array_split(shuffled_split_keys, k_folds)
             else:
-                stratify_keys = self.get_stratify_key(metadata)
+                stratify_keys = self.get_stratify_keys(metadata, split_keys=split_keys)
                 shuffled_split_keys = np.array(shuffled_split_keys)
                 kf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=str2int(seed))
                 folds_keys = [
