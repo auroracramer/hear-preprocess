@@ -74,7 +74,7 @@ generic_task_config = {
         "event_postprocessing_grid": {
             # In preliminary tests, these smoothing parameters worked
             # well at optimizing onset fms.
-            "threshold_multitrack_unify": 30,
+            "threshold_multitrack_unify": [30.0],
         },
     },
 }
