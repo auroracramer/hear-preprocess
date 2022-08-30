@@ -316,7 +316,7 @@ class ExtractMetadata(pipeline.ExtractMetadata):
                             for t in (start, end)
                         )
                         row = (
-                            (start, end, track_id, label)
+                            (t_start, t_end, track_id, label)
                             + opt_tuple(azimuth, pointwise)
                             + opt_tuple(azimuth_left, boxwise)
                             + opt_tuple(azimuth_right, boxwise)
