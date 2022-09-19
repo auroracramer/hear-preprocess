@@ -41,6 +41,22 @@ generic_task_config = {
         "elevation": True,
         "distance": False
     },
+    # TAU 2021 SSE NIGENS doesn't include the vocabulary in the dataset files
+    "soundata_remap_labels": {
+        "0":  "female-speech-woman-speaking",
+        "1":  "male-speech-man-speaking",
+        "2":  "clapping",
+        "3":  "telephone",
+        "4":  "laughter",
+        "5":  "domestic-sounds",
+        "6":  "walk-footsteps",
+        "7":  "door-open-or-close",
+        "8":  "music",
+        "9":  "musical-instrument",
+        "10": "water-tap-faucet",
+        "11": "bell",
+        "12": "knock",
+    },
     "soundata_metadata_clip_attrs": ["location_id"], 
     "soundata_splits": [
         {
